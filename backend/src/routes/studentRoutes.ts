@@ -1,9 +1,15 @@
-import express, { Request, Response } from "express";
-import { requireOrgRole } from "../middleware/auth";
+import express from "express";
+import type { Request, Response } from "express";
+import { requireOrgRole, requireAuth } from "../middleware/auth";
 import StudentProfile from "../models/StudentProfile";
 import { getAuth } from "@clerk/express";
+import { syncUser } from "../controllers/studentController";
 
 const router = express.Router();
+
+// POST /api/student/sync
+// Syncs the user from Clerk to MongoDB
+router.post("/sync", requireAuth(), syncUser);
 
 // GET /api/student/profile
 // Returns the student's profile and connection status

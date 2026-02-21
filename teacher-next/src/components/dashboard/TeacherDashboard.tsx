@@ -1,10 +1,25 @@
 'use client';
 
 import { useUser, useOrganization } from "@clerk/nextjs";
+import { useApi } from "../../../lib/api";
+import { useState } from "react";
 
 export default function TeacherDashboard() {
   const { user } = useUser();
   const { organization } = useOrganization();
+  const api = useApi();
+  const [testResult, setTestResult] = useState<string>("");
+
+  const handleTestApi = async () => {
+    try {
+      setTestResult("Loading...");
+      // Hitting the test teacher endpoint we discovered in index.ts earlier
+      const res = await api.get("/api/test/teacher");
+      setTestResult(`Success: ${JSON.stringify(res.data)}`);
+    } catch (error: any) {
+      setTestResult(`Error: ${error.response?.data?.message || error.message}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -65,6 +80,16 @@ export default function TeacherDashboard() {
               <button className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 px-4 py-2 rounded-md text-sm font-medium transition-colors text-left">
                 View Reports
               </button>
+              <button 
+                onClick={handleTestApi}
+                className="w-full bg-green-50 text-green-700 hover:bg-green-100 px-4 py-2 rounded-md text-sm font-medium transition-colors text-left mt-4 border border-green-200">
+                🚀 Test API Connection
+              </button>
+              {testResult && (
+                <div className="mt-2 p-2 bg-gray-100 text-xs text-gray-800 rounded break-all whitespace-pre-wrap">
+                  {testResult}
+                </div>
+              )}
             </div>
           </div>
 

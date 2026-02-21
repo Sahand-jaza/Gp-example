@@ -1,24 +1,24 @@
 import axios from "axios";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 
-// Basic instance without auth (for server components or public routes)
+// For local testing on emulator, you might need your machine's local IP address instead of localhost.
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+  baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-export default api;
-
-// Custom Hook to use API with automatically injected Clerk Token (for Client Components)
 export const useApi = () => {
   const { getToken } = useAuth();
 
   const authApi = useMemo(() => {
     const instance = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+      baseURL: API_URL,
       headers: {
         "Content-Type": "application/json",
       },
@@ -42,5 +42,7 @@ export const useApi = () => {
     return instance;
   }, [getToken]);
 
-  return authApi;
+  return authApi; 
 };
+
+export default api;

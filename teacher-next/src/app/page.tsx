@@ -14,8 +14,8 @@ export default function Home() {
     );
   }
 
-  // If user has the specific teacher role
-  if (orgRole === 'org:teacher') {
+  // If user has the specific teacher role or is the admin/creator of the org
+  if (orgRole === 'org:teacher' || orgRole === 'org:admin') {
     return <TeacherDashboard />;
   }
 

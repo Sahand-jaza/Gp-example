@@ -15,9 +15,9 @@ const resend = process.env.RESEND_API_KEY
   : null;
 
 export const startCronJobs = () => {
-  // Run every day at 8 PM
-  cron.schedule("0 20 * * *", async () => {
-    console.log("Running Daily Summary Job...");
+  // Run every Saturday at 8 PM
+  cron.schedule("0 20 * * 6", async () => {
+    console.log("Running Weekly Summary Job...");
 
     try {
       const students = await StudentProfile.find().populate("parentId");
