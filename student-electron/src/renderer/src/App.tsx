@@ -1,9 +1,30 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, OrganizationSwitcher, Protect, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, OrganizationSwitcher, Protect, UserButton, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import StudentDashboard from './components/dashboard/StudentDashboard'
+import { useEffect } from 'react'
+import axios from 'axios'
 
 function HelloUser() {
   const { organization, isLoaded } = useOrganization();
+  const { getToken, userId } = useAuth();
+
+  useEffect(() => {
+    const syncUser = async () => {
+      if (userId) {
+        try {
+          const token = await getToken();
+          await axios.post('http://localhost:5000/api/student/sync', {}, {
+             headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log("User synced with MongoDB");
+        } catch (error) {
+          console.error("Sync failed:", error);
+        }
+      }
+    };
+    
+    syncUser();
+  }, [userId, getToken]);
 
   // Handle loading state
   if (!isLoaded) {
@@ -141,6 +162,10 @@ function App(): JSX.Element {
               <SignUp routing="path" path="/sign-up" unsafeMetadata={{ role: 'student' }} />
             </div>
           }
+        />
+        <Route
+          path="/sso-callback"
+          element={<AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" signInForceRedirectUrl="/" />}
         />
         <Route
           path="/"

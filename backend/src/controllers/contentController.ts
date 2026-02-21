@@ -55,6 +55,18 @@ export const addVideoToCourse = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
     const { title, s3Key, duration } = req.body;
+    const teacherId = (req as any).auth.userId;
+
+    // Verify course exists and belongs to this teacher
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res
+        .status(403)
+        .json({
+          message: "Forbidden: You do not own this course or it doesn't exist",
+        });
+      return;
+    }
 
     const video = await Video.create({
       courseId,

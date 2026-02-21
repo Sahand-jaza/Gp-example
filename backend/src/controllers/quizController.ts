@@ -3,6 +3,8 @@ import Quiz from "../models/Quiz";
 import QuizResult from "../models/QuizResult";
 import Video from "../models/Video";
 
+import Course from "../models/Course"; // Added Course import
+
 // Create Quiz (Teacher)
 export const createQuiz = async (req: Request, res: Response) => {
   try {
@@ -13,6 +15,25 @@ export const createQuiz = async (req: Request, res: Response) => {
     const video = await Video.findById(videoId);
     if (!video) {
       res.status(404).json({ message: "Video not found" });
+      return;
+    }
+
+    // Verify course belongs to this teacher
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res
+        .status(403)
+        .json({ message: "Forbidden: You do not own the parent course" });
+      return;
+    }
+
+    // Verify video actually belongs to this course
+    if (video.courseId?.toString() !== courseId) {
+      res
+        .status(400)
+        .json({
+          message: "Bad Request: Video does not belong to the specified course",
+        });
       return;
     }
 

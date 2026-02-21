@@ -1,0 +1,11 @@
+```http
+GET http://localhost:5000/api/test/teacher
+
+###
+
+GET http://localhost:5000/api/test/student
+
+###
+
+GET http://localhost:5000/api/test/admin
+```
