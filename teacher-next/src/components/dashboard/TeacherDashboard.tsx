@@ -1,12 +1,11 @@
 'use client';
 
-import { useUser, useOrganization } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import { useApi } from "../../../lib/api";
 import { useState } from "react";
 
 export default function TeacherDashboard() {
   const { user } = useUser();
-  const { organization } = useOrganization();
   const api = useApi();
   const [testResult, setTestResult] = useState<string>("");
 
@@ -32,9 +31,8 @@ export default function TeacherDashboard() {
               Welcome, {user?.firstName}
             </p>
           </div>
-           <div className="text-right">
-             <p className="text-sm font-medium text-gray-900">{organization?.name}</p>
-             <p className="text-xs text-gray-500">Organization</p>
+          <div className="flex items-center gap-4 text-right">
+            <UserButton afterSignOutUrl="/" />
           </div>
         </div>
       </header>
@@ -42,21 +40,21 @@ export default function TeacherDashboard() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           {/* Stats / Overview */}
           <div className="col-span-1 md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-               <p className="text-gray-500 text-sm font-medium">Total Classes</p>
-               <p className="text-3xl font-bold text-blue-600">0</p>
-             </div>
-             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-               <p className="text-gray-500 text-sm font-medium">Total Students</p>
-               <p className="text-3xl font-bold text-green-600">0</p>
-             </div>
-             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-               <p className="text-gray-500 text-sm font-medium">Pending Assignments</p>
-               <p className="text-3xl font-bold text-amber-600">0</p>
-             </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <p className="text-gray-500 text-sm font-medium">Total Classes</p>
+              <p className="text-3xl font-bold text-blue-600">0</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <p className="text-gray-500 text-sm font-medium">Total Students</p>
+              <p className="text-3xl font-bold text-green-600">0</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <p className="text-gray-500 text-sm font-medium">Pending Assignments</p>
+              <p className="text-3xl font-bold text-amber-600">0</p>
+            </div>
           </div>
 
           {/* Recent Activity */}
@@ -80,7 +78,7 @@ export default function TeacherDashboard() {
               <button className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 px-4 py-2 rounded-md text-sm font-medium transition-colors text-left">
                 View Reports
               </button>
-              <button 
+              <button
                 onClick={handleTestApi}
                 className="w-full bg-green-50 text-green-700 hover:bg-green-100 px-4 py-2 rounded-md text-sm font-medium transition-colors text-left mt-4 border border-green-200">
                 🚀 Test API Connection

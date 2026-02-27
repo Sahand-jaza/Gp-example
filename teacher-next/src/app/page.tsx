@@ -1,5 +1,5 @@
 'use client';
-import { useAuth, useUser, OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { useAuth, useUser, UserButton } from "@clerk/nextjs";
 import TeacherDashboard from "../components/dashboard/TeacherDashboard";
 
 export default function Home() {
@@ -14,12 +14,11 @@ export default function Home() {
     );
   }
 
-  // If user has the specific teacher role or is the admin/creator of the org
-  if (orgRole === 'org:teacher' || orgRole === 'org:admin') {
+  // Assuming we still want to keep the dashboard for now; we'll remove orgRole check next.
+  if (user) {
     return <TeacherDashboard />;
   }
 
-  // Fallback / Access Denied for everyone else (including students/parents)
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="absolute top-4 right-4">
@@ -28,14 +27,8 @@ export default function Home() {
       <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Teacher portal</h1>
         <p className="text-gray-600 mb-6">
-          Welcome, {user?.firstName}.<br />
-          Please sign in with a <strong>Teacher</strong> account to access this dashboard.
+          Please sign in to access this dashboard.
         </p>
-
-        {/* If they are in an org but not a teacher, show switcher to change org/account */}
-        <div className="flex justify-center">
-          <OrganizationSwitcher afterCreateOrganizationUrl="/" hidePersonal={true} />
-        </div>
       </div>
     </div>
   );
