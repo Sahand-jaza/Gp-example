@@ -14,20 +14,25 @@ export default function Home() {
     );
   }
 
-  // Assuming we still want to keep the dashboard for now; we'll remove orgRole check next.
-  if (user) {
+  // Ensure only users explicitly marked as "teacher" in their Clerk publicMetadata can access this app
+  const isTeacher = user?.publicMetadata?.role === 'teacher';
+
+  if (user && isTeacher) {
     return <TeacherDashboard />;
   }
 
+  // Fallback for non-logged-in users, OR logged-in users who are NOT teachers
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 relative">
       <div className="absolute top-4 right-4">
-        <UserButton />
+        <UserButton afterSignOutUrl="/" />
       </div>
       <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Teacher portal</h1>
+        <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
         <p className="text-gray-600 mb-6">
-          Please sign in to access this dashboard.
+          {user
+            ? "Your account does not have Teacher privileges. Please sign out and log in with a valid Teacher account."
+            : "Please sign in to access the Teacher portal."}
         </p>
       </div>
     </div>
