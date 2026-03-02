@@ -32,6 +32,18 @@ export const getUploadUrl = async (req: Request, res: Response) => {
   }
 };
 
+// Get Teacher's Own Courses
+export const getMyCourses = async (req: Request, res: Response) => {
+  try {
+    const teacherId = (req as any).auth.userId;
+    const courses = await Course.find({ teacherId }).sort({ createdAt: -1 });
+    res.json(courses);
+  } catch (error) {
+    console.error("Get My Courses Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Create Course
 export const createCourse = async (req: Request, res: Response) => {
   try {

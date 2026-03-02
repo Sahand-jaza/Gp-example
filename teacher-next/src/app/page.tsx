@@ -1,9 +1,9 @@
 'use client';
-import { useAuth, useUser, UserButton } from "@clerk/nextjs";
-import TeacherDashboard from "../components/dashboard/TeacherDashboard";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  const { isLoaded, orgRole } = useAuth();
+  const { isLoaded } = useAuth();
   const { user } = useUser();
 
   if (!isLoaded) {
@@ -16,7 +16,7 @@ export default function Home() {
 
   // For now, allow anyone who logs in to access the Teacher Portal
   if (user) {
-    return <TeacherDashboard />;
+    redirect("/dashboard");
   }
 
   // Fallback for non-logged-in users

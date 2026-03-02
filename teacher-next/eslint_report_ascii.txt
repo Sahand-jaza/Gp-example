@@ -1,0 +1,30 @@
+
+D:\Gp-example\teacher-next\lib\roles.ts
+  5:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Gp-example\teacher-next\src\app\dashboard\courses\[courseId]\page.tsx
+   8:8   warning  'Link' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  18:10  warning  'course' is assigned a value but never used                                                                     @typescript-eslint/no-unused-vars
+  18:18  warning  'setCourse' is assigned a value but never used                                                                  @typescript-eslint/no-unused-vars
+  45:6   warning  React Hook useEffect has a missing dependency: 'fetchVideos'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\Gp-example\teacher-next\src\app\dashboard\courses\page.tsx
+  34:6  warning  React Hook useEffect has a missing dependency: 'fetchCourses'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\Gp-example\teacher-next\src\app\page.tsx
+  6:21  warning  'orgRole' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Gp-example\teacher-next\src\components\dashboard\CourseForm.tsx
+  34:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Gp-example\teacher-next\src\components\dashboard\TeacherDashboard.tsx
+  18:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Gp-example\teacher-next\src\components\dashboard\VideoUploadForm.tsx
+  100:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Gp-example\teacher-next\src\middleware.ts
+  2:3  warning  'ClerkMiddlewareAuth' is defined but never used  @typescript-eslint/no-unused-vars
+
+??? 11 problems (4 errors, 7 warnings)
+

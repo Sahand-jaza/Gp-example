@@ -15,30 +15,32 @@ export default function TeacherDashboard() {
       // Hitting the test teacher endpoint we discovered in index.ts earlier
       const res = await api.get("/api/test/teacher");
       setTestResult(`Success: ${JSON.stringify(res.data)}`);
-    } catch (error: any) {
-      setTestResult(`Error: ${error.response?.data?.message || error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setTestResult(`Error: ${error.message}`);
+      } else {
+        setTestResult(`Error: An unknown error occurred`);
+      }
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Teacher Portal</h1>
-            <p className="text-sm text-gray-500">
-              Welcome, {user?.firstName}
-            </p>
-          </div>
-          <div className="flex items-center gap-4 text-right">
-            <UserButton afterSignOutUrl="/" />
-          </div>
+    <div className="flex flex-col flex-1 h-full w-full">
+      {/* Header Inside Page */}
+      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
+          <p className="text-sm text-gray-500">
+            Welcome, {user?.firstName}
+          </p>
+        </div>
+        <div className="flex items-center gap-4 text-right">
+          <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-6">
+      <main className="flex-1 p-6 overflow-y-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
           {/* Stats / Overview */}

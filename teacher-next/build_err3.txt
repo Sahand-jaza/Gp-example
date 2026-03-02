@@ -1,0 +1,44 @@
+
+> teacher-next@0.1.0 build
+> next build
+
+??? Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+node.exe : ??? The "middleware" file convention is deprecated. 
+Please use "proxy" instead. Learn more: 
+https://nextjs.org/docs/messages/middleware-to-proxy
+At C:\Program Files\nodejs\npm.ps1:29 char:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (??? The "middle... 
+   leware-to-proxy:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Creating an optimized production build ...
+??? Compiled successfully in 9.3s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/7) ...
+  Generating static pages using 7 workers (1/7) 
+  Generating static pages using 7 workers (3/7) 
+  Generating static pages using 7 workers (5/7) 
+??? Generating static pages using 7 workers (7/7) in 945.3ms
+  Finalizing page optimization ...
+
+Route (app)
+??? ??? /
+??? ??? /_not-found
+??? ?? /api/webhooks/clerk
+??? ??? /dashboard
+??? ??? /dashboard/courses
+??? ?? /dashboard/courses/[courseId]
+??? ?? /sign-in/[[...sign-in]]
+??? ?? /sign-up/[[...sign-up]]
+
+
+?? Proxy (Middleware)
+
+???  (Static)   prerendered as static content
+??  (Dynamic)  server-rendered on demand
+

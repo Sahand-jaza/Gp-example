@@ -9,7 +9,7 @@ import { createServer } from "http";
 import { WebSocketServer } from "ws";
 
 // Load env vars
-dotenv.config();
+dotenv.config({ override: true });
 
 // Connect to MongoDB
 connectDB();
