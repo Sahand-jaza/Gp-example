@@ -9,6 +9,7 @@ const videoSchema = new mongoose.Schema({
   title: { type: String, required: true },
   s3Key: { type: String, required: true }, // Not the public URL
   duration: { type: Number }, // in seconds
+  order: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 

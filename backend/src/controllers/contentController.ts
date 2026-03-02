@@ -230,11 +230,16 @@ export const addVideoToCourse = async (req: Request, res: Response) => {
       return;
     }
 
+    // Find highest order to put new video at the end
+    const lastVideo = await Video.findOne({ courseId }).sort({ order: -1 });
+    const newOrder = lastVideo ? lastVideo.order + 1 : 0;
+
     const video = await Video.create({
       courseId,
       title,
       s3Key,
       duration,
+      order: newOrder,
     });
 
     res.status(201).json(video);
@@ -248,8 +253,8 @@ export const getCourseVideos = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
 
-    // Find videos
-    const videos = await Video.find({ courseId });
+    // Find videos (sorted by order by default)
+    const videos = await Video.find({ courseId }).sort({ order: 1, createdAt: 1 });
 
     // Generate Signed URLs for each
     const videosWithUrls = await Promise.all(
@@ -273,6 +278,104 @@ export const getCourseVideos = async (req: Request, res: Response) => {
     res.json(videosWithUrls);
   } catch (error) {
     console.error("Get Videos Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update Video (Rename)
+export const updateVideo = async (req: Request, res: Response) => {
+  try {
+    const { courseId, videoId } = req.params;
+    const { title } = req.body;
+    const teacherId = (req as any).auth.userId;
+
+    // Fast check course ownership
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    const video = await Video.findOneAndUpdate(
+      { _id: videoId, courseId },
+      { title },
+      { new: true }
+    );
+
+    if (!video) {
+      res.status(404).json({ message: "Video not found" });
+      return;
+    }
+
+    res.json(video);
+  } catch (error) {
+    console.error("Update Video Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete Video
+export const deleteVideo = async (req: Request, res: Response) => {
+  try {
+    const { courseId, videoId } = req.params;
+    const teacherId = (req as any).auth.userId;
+
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    const video = await Video.findOne({ _id: videoId, courseId });
+    if (!video) {
+      res.status(404).json({ message: "Video not found" });
+      return;
+    }
+
+    // Delete from S3
+    if (video.s3Key) {
+      try {
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: video.s3Key,
+        }));
+      } catch (err) {
+        console.error("Failed to delete video from S3:", video.s3Key);
+      }
+    }
+
+    await Video.deleteOne({ _id: videoId });
+    res.json({ message: "Video deleted successfully" });
+  } catch (error) {
+    console.error("Delete Video Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Reorder Videos
+export const reorderVideos = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const { list } = req.body; // Array of { id, order }
+    const teacherId = (req as any).auth.userId;
+
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    // Bulk update orders
+    for (let item of list) {
+      await Video.updateOne(
+        { _id: item.id, courseId },
+        { $set: { order: item.order } }
+      );
+    }
+
+    res.json({ message: "Videos reordered" });
+  } catch (error) {
+    console.error("Reorder Videos Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
