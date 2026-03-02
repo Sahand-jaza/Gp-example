@@ -3,7 +3,8 @@ export interface Course {
   teacherId: string;
   title: string;
   description: string;
-  thumbnail: string;
+  thumbnail?: string;
+  thumbnailUrl?: string;
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;

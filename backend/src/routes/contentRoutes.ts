@@ -6,6 +6,9 @@ import {
   addVideoToCourse,
   getCourseVideos,
   getMyCourses,
+  getCourse,
+  updateCourse,
+  deleteCourse,
 } from "../controllers/contentController";
 
 const router = express.Router();
@@ -24,6 +27,24 @@ router.get(
   getMyCourses,
 );
 router.post("/", requireAuth(), requireOrgRole("org:teacher"), createCourse); // Create Course
+router.get(
+  "/:courseId",
+  requireAuth(),
+  requireOrgRole("org:teacher"),
+  getCourse,
+);
+router.patch(
+  "/:courseId",
+  requireAuth(),
+  requireOrgRole("org:teacher"),
+  updateCourse,
+);
+router.delete(
+  "/:courseId",
+  requireAuth(),
+  requireOrgRole("org:teacher"),
+  deleteCourse,
+);
 router.post(
   "/:courseId/videos",
   requireAuth(),

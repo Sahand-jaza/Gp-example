@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useApi } from "@/lib/api";
-import { Video as VideoType } from "@/types";
-import { ArrowLeft, Plus, Video, PlayCircle, Loader2 } from "lucide-react";
+import { Video as VideoType, Course } from "@/types";
+import { ArrowLeft, Plus, Video, PlayCircle, Loader2, Edit, Globe, EyeOff } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
-import VideoUploadForm from "@/components/dashboard/VideoUploadForm"; // Will create this next
+import VideoUploadForm from "@/components/dashboard/VideoUploadForm";
+import EditCourseForm from "@/components/dashboard/EditCourseForm";
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -15,23 +16,37 @@ export default function CourseDetailPage() {
   const courseId = params.courseId as string;
 
   const [videos, setVideos] = useState<VideoType[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // We actually don't have a GET /api/courses/:courseId in the backend either, 
-  // but we do have GET /api/courses/:courseId/videos.
-  // We'll fetch videos, but for actual course title display, we might need a new endpoint or pass state.
-  // For now, let's fetch videos.
-  const fetchVideos = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get(`/api/courses/${courseId}/videos`);
-      setVideos(res.data);
-      // Wait, let's also fetch course details if possible, otherwise mock it.
-      // We will need a backend `GET /api/courses/:id` later.
+      const [videosRes, courseRes] = await Promise.all([
+        api.get(`/api/courses/${courseId}/videos`),
+        api.get(`/api/courses/${courseId}`)
+      ]);
+      setVideos(videosRes.data);
+      setCourse(courseRes.data);
     } catch (error) {
-      console.error("Failed to fetch videos:", error);
+      console.error("Failed to fetch data:", error);
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTogglePublish = async () => {
+    if (!course) return;
+    try {
+      setIsLoading(true); // Can also use a separate loading state to avoid full page reload look, but this resyncs data nicely
+      await api.patch(`/api/courses/${courseId}`, {
+        isPublished: !course.isPublished
+      });
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to toggle publish status", err);
       setIsLoading(false);
     }
   };
@@ -39,7 +54,7 @@ export default function CourseDetailPage() {
   useEffect(() => {
     if (courseId) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      fetchVideos();
+      fetchData();
     }
   }, [courseId, api]);
 
@@ -54,11 +69,53 @@ export default function CourseDetailPage() {
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to Courses
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            Course details
-          </h1>
+          <div className="flex items-center gap-4 mt-1">
+            {course?.thumbnailUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img 
+                src={course.thumbnailUrl} 
+                alt={course.title} 
+                className="w-16 h-16 rounded-lg object-cover border border-gray-200 shadow-sm shrink-0"
+              />
+            )}
+            <h1 className="text-2xl font-bold text-gray-900 flex flex-col gap-1">
+              {course ? course.title : "Course details"}
+              {course?.description && (
+                <span className="text-sm font-normal text-gray-500">{course.description}</span>
+              )}
+            </h1>
+            {course && (
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 ${
+                course.isPublished ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+              }`}>
+                {course.isPublished ? "Published" : "Draft"}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 mt-4 md:mt-0">
+          <button
+            onClick={handleTogglePublish}
+            disabled={isLoading || !course}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              course?.isPublished 
+                ? "bg-amber-100 text-amber-700 hover:bg-amber-200" 
+                : "bg-green-100 text-green-700 hover:bg-green-200"
+            } disabled:opacity-50`}
+          >
+            {course?.isPublished ? (
+              <><EyeOff className="w-4 h-4" /> Unpublish</>
+            ) : (
+              <><Globe className="w-4 h-4" /> Publish</>
+            )}
+          </button>
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            <Edit className="w-4 h-4" />
+            Edit Details
+          </button>
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
@@ -132,7 +189,19 @@ export default function CourseDetailPage() {
           onClose={() => setIsUploadModalOpen(false)}
           onSuccess={() => {
             setIsUploadModalOpen(false);
-            fetchVideos();
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* Edit Course Modal */}
+      {isEditModalOpen && course && (
+        <EditCourseForm
+          course={course}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            fetchData();
           }}
         />
       )}

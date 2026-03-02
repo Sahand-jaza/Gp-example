@@ -79,10 +79,28 @@ export default function CoursesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
               <div key={course._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-40 bg-gray-100 relative group">
-                  {/* Thumbnail Placeholder */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <PlayCircle className="w-12 h-12 text-gray-300" />
+                <div className="h-40 bg-gray-100 relative group overflow-hidden">
+                  {course.thumbnailUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img 
+                      src={course.thumbnailUrl} 
+                      alt={course.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <PlayCircle className="w-12 h-12 text-gray-300" />
+                    </div>
+                  )}
+                  {/* Status Badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm backdrop-blur-md ${
+                      course.isPublished 
+                        ? "bg-green-500/90 text-white" 
+                        : "bg-gray-800/80 text-white"
+                    }`}>
+                      {course.isPublished ? "Published" : "Draft"}
+                    </span>
                   </div>
                 </div>
                 <div className="p-5">

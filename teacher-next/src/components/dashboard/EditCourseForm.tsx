@@ -3,18 +3,20 @@
 import { useState } from "react";
 import { useApi } from "@/lib/api";
 import { X } from "lucide-react";
+import { Course } from "@/types";
 import ImageUpload from "./ImageUpload";
 
-interface CourseFormProps {
+interface EditCourseFormProps {
+  course: Course;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
+export default function EditCourseForm({ course, onClose, onSuccess }: EditCourseFormProps) {
   const api = useApi();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [thumbnail, setThumbnail] = useState("");
+  const [title, setTitle] = useState(course.title);
+  const [description, setDescription] = useState(course.description || "");
+  const [thumbnail, setThumbnail] = useState(course.thumbnail || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,7 +30,7 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
     try {
       setIsSubmitting(true);
       setError("");
-      await api.post("/api/courses", {
+      await api.patch(`/api/courses/${course._id}`, {
         title,
         description,
         thumbnail,
@@ -36,9 +38,9 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
       onSuccess();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message || "Failed to create course");
+        setError(err.message || "Failed to update course");
       } else {
-        setError("Failed to create course");
+        setError("Failed to update course");
       }
     } finally {
       setIsSubmitting(false);
@@ -49,7 +51,7 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-5 border-b border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-900">Create New Course</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Edit Course</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -61,7 +63,7 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
               {error}
             </div>
           )}
-
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Course Thumbnail
@@ -69,9 +71,10 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
             <ImageUpload 
               value={thumbnail}
               onChange={setThumbnail}
+              existingImageUrl={course.thumbnailUrl}
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Course Title <span className="text-red-500">*</span>
@@ -117,7 +120,7 @@ export default function CourseForm({ onClose, onSuccess }: CourseFormProps) {
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                "Create Course"
+                "Save Changes"
               )}
             </button>
           </div>

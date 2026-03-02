@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/s3";
 import Course from "../models/Course";
@@ -8,7 +8,7 @@ import Video from "../models/Video";
 // Get Presigned URL for Upload (Teacher only)
 export const getUploadUrl = async (req: Request, res: Response) => {
   try {
-    const { fileName, contentType } = req.body;
+    const { fileName, contentType, folder = "videos" } = req.body;
     const userId = (req as any).auth.userId; // Ensure this is a teacher in middleware/logic
 
     if (!fileName || !contentType) {
@@ -16,7 +16,7 @@ export const getUploadUrl = async (req: Request, res: Response) => {
       return;
     }
 
-    const key = `videos/${userId}/${Date.now()}-${fileName}`;
+    const key = `${folder}/${userId}/${Date.now()}-${fileName}`;
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
@@ -37,9 +37,76 @@ export const getMyCourses = async (req: Request, res: Response) => {
   try {
     const teacherId = (req as any).auth.userId;
     const courses = await Course.find({ teacherId }).sort({ createdAt: -1 });
-    res.json(courses);
+
+    const coursesWithThumbnails = await Promise.all(
+      courses.map(async (course) => {
+        let thumbnailUrl = null;
+        if (course.thumbnail) {
+          try {
+            const command = new GetObjectCommand({
+              Bucket: process.env.AWS_BUCKET_NAME,
+              Key: course.thumbnail,
+            });
+            thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+          } catch (err) {
+            console.error("Failed to generate thumbnail url for", course._id);
+          }
+        }
+        return { ...course.toObject(), thumbnailUrl };
+      })
+    );
+
+    res.json(coursesWithThumbnails);
   } catch (error) {
     console.error("Get My Courses Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get Single Course
+export const getCourse = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const teacherId = (req as any).auth?.userId;
+
+    console.log(`[getCourse] called for courseId: ${courseId}, teacherId: ${teacherId}`);
+
+    const course = await Course.findOne({ _id: courseId });
+    console.log(`[getCourse] Course found by ID without teacher check:`, course ? "YES" : "NO", course?.teacherId);
+
+    if (!course) {
+      console.log(`[getCourse] Returning 404 - Course totally not found`);
+      res.status(404).json({ message: "Course not found" });
+      return;
+    }
+
+    if (course.teacherId !== teacherId) {
+       console.log(`[getCourse] Course teacherId ${course.teacherId} !== requesting teacherId ${teacherId}`);
+    }
+
+    const matchedCourse = await Course.findOne({ _id: courseId, teacherId });
+    if (!matchedCourse) {
+      res.status(404).json({ message: "Course not found or unauthorized" });
+      return;
+    }
+    
+    let thumbnailUrl = null;
+    if (matchedCourse.thumbnail) {
+      try {
+        const command = new GetObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: matchedCourse.thumbnail,
+        });
+        thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      } catch (err) {
+        console.error("Failed to generate thumbnail url for", matchedCourse._id);
+      }
+    }
+    
+    console.log(`[getCourse] Returning Course seamlessly`);
+    res.json({ ...matchedCourse.toObject(), thumbnailUrl });
+  } catch (error) {
+    console.error(`[getCourse] Error:`, error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -47,17 +114,100 @@ export const getMyCourses = async (req: Request, res: Response) => {
 // Create Course
 export const createCourse = async (req: Request, res: Response) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, thumbnail } = req.body;
     const teacherId = (req as any).auth.userId;
 
     const course = await Course.create({
       teacherId,
       title,
       description,
+      thumbnail,
     });
 
     res.status(201).json(course);
   } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update Course
+export const updateCourse = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const { title, description, thumbnail, isPublished } = req.body;
+    const teacherId = (req as any).auth.userId;
+
+    // Only update fields that are explicitly provided
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
+    if (isPublished !== undefined) updateData.isPublished = isPublished;
+
+    const course = await Course.findOneAndUpdate(
+      { _id: courseId, teacherId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!course) {
+      res.status(404).json({ message: "Course not found or unauthorized" });
+      return;
+    }
+
+    res.json(course);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete Course
+export const deleteCourse = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const teacherId = (req as any).auth.userId;
+
+    // Verify course exists and belongs to teacher
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      res.status(404).json({ message: "Course not found or unauthorized" });
+      return;
+    }
+
+    // Get all videos and delete from S3
+    const videos = await Video.find({ courseId });
+    for (const v of videos) {
+      if (v.s3Key) {
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: v.s3Key,
+          }));
+        } catch (err) {
+          console.error("Failed to delete video from S3:", v.s3Key);
+        }
+      }
+    }
+
+    // Delete thumbnail from S3 if exists
+    if (course.thumbnail) {
+      try {
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: course.thumbnail,
+        }));
+      } catch (err) {
+        console.error("Failed to delete thumbnail from S3:", course.thumbnail);
+      }
+    }
+
+    // Delete records from database
+    await Video.deleteMany({ courseId });
+    await Course.deleteOne({ _id: courseId });
+
+    res.json({ message: "Course deleted successfully" });
+  } catch (error) {
+    console.error("Delete Course Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
