@@ -21,3 +21,20 @@ export interface Video {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface QuizQuestion {
+  _id?: string;
+  questionText: string;
+  options: string[];
+  correctAnswerIndex: number;
+}
+
+export interface Quiz {
+  _id: string;
+  title: string;
+  courseId: string;
+  videoId: string;
+  teacherId: string;
+  questions: QuizQuestion[];
+  createdAt: string;
+}

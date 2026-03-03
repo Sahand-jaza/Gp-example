@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useApi } from "@/lib/api";
-import { Video as VideoType, Course } from "@/types";
-import { ArrowLeft, Plus, Video, PlayCircle, Loader2, Edit, Globe, EyeOff, Trash2, ChevronUp, ChevronDown, Check, X } from "lucide-react";
+import { Video as VideoType, Course, Quiz } from "@/types";
+import { ArrowLeft, Plus, Video, PlayCircle, Loader2, Edit, Globe, EyeOff, Trash2, ChevronUp, ChevronDown, Check, X, Sparkles } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import VideoUploadForm from "@/components/dashboard/VideoUploadForm";
 import EditCourseForm from "@/components/dashboard/EditCourseForm";
+import VideoModal from "@/components/dashboard/VideoModal";
+import QuizModal from "@/components/dashboard/QuizModal";
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -17,24 +19,30 @@ export default function CourseDetailPage() {
 
   const [videos, setVideos] = useState<VideoType[]>([]);
   const [course, setCourse] = useState<Course | null>(null);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [previewVideo, setPreviewVideo] = useState<{url: string, title: string} | null>(null);
 
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editVideoTitle, setEditVideoTitle] = useState("");
   const [isUpdatingVideo, setIsUpdatingVideo] = useState(false);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState<string | null>(null);
+  const [generatedQuiz, setGeneratedQuiz] = useState<Quiz | null>(null);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [videosRes, courseRes] = await Promise.all([
+      const [videosRes, courseRes, quizzesRes] = await Promise.all([
         api.get(`/api/courses/${courseId}/videos`),
-        api.get(`/api/courses/${courseId}`)
+        api.get(`/api/courses/${courseId}`),
+        api.get(`/api/quizzes/course/${courseId}`)
       ]);
       setVideos(videosRes.data);
       setCourse(courseRes.data);
+      setQuizzes(quizzesRes.data);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -122,6 +130,39 @@ export default function CourseDetailPage() {
     } finally {
       setIsUpdatingVideo(false);
     }
+  };
+
+  const handleGenerateQuiz = async (videoId: string) => {
+    try {
+      setIsGeneratingQuiz(videoId);
+      const res = await api.post(`/api/quizzes/generate/${videoId}`);
+      setQuizzes([...quizzes.filter(q => q.videoId !== videoId), res.data]);
+      setGeneratedQuiz(res.data);
+    } catch (err) {
+      console.error("Failed to generate quiz", err);
+      alert("Failed to generate the AI Quiz. Please try again.");
+    } finally {
+      setIsGeneratingQuiz(null);
+    }
+  };
+
+  const handleCreateManualQuiz = (videoId: string) => {
+    // Open the modal with a blank template if they want to build from scratch
+    setGeneratedQuiz({
+      _id: "",
+      title: "New Custom Quiz",
+      courseId: courseId,
+      videoId: videoId,
+      teacherId: "", // Handled by backend
+      questions: [
+         {
+          questionText: "",
+          options: ["", "", "", ""],
+          correctAnswerIndex: 0,
+         }
+      ],
+      createdAt: new Date().toISOString()
+    });
   };
 
   useEffect(() => {
@@ -237,7 +278,9 @@ export default function CourseDetailPage() {
               <h2 className="font-semibold text-gray-900">Course Content ({videos.length})</h2>
             </div>
             <ul className="divide-y divide-gray-100">
-              {videos.map((video, index) => (
+              {videos.map((video, index) => {
+                const existingQuiz = quizzes.find(q => q.videoId === video._id);
+                return (
                 <li key={video._id} className="p-4 hover:bg-gray-50 transition-colors flex items-start sm:items-center gap-4 flex-col sm:flex-row group">
                   
                   {/* Reorder Controls */}
@@ -304,16 +347,48 @@ export default function CourseDetailPage() {
 
                   <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                     {video.url ? (
-                      <a 
-                        href={video.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
+                      <button 
+                        onClick={() => setPreviewVideo({ url: video.url!, title: video.title })}
                         className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors text-center w-full sm:w-auto"
                       >
                         Preview
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-sm text-gray-400">Processing...</span>
+                    )}
+
+                    {existingQuiz ? (
+                      <button 
+                        onClick={() => setGeneratedQuiz(existingQuiz)}
+                        disabled={isUpdatingVideo}
+                        className="text-sm text-indigo-700 hover:text-indigo-900 font-medium px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors text-center w-full sm:w-auto flex items-center justify-center gap-1.5"
+                      >
+                         <Edit className="w-3.5 h-3.5" /> View / Edit Quiz
+                      </button>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={() => handleCreateManualQuiz(video._id)}
+                          disabled={isUpdatingVideo}
+                          className="text-sm text-gray-700 hover:text-gray-900 font-medium px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors text-center w-full sm:w-auto"
+                        >
+                          Write Quiz
+                        </button>
+
+                        <button 
+                          onClick={() => handleGenerateQuiz(video._id)}
+                          disabled={isUpdatingVideo || isGeneratingQuiz === video._id}
+                          className="text-sm text-purple-600 hover:text-purple-800 font-medium px-3 py-1.5 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors text-center w-full sm:w-auto flex items-center justify-center gap-1.5"
+                          title="Generate AI Quiz"
+                        >
+                          {isGeneratingQuiz === video._id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5" />
+                          )}
+                          AI Quiz
+                        </button>
+                      </>
                     )}
 
                     <button 
@@ -326,7 +401,8 @@ export default function CourseDetailPage() {
                     </button>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}
@@ -353,6 +429,28 @@ export default function CourseDetailPage() {
             setIsEditModalOpen(false);
             fetchData();
           }}
+        />
+      )}
+
+      {/* Video Preview Modal */}
+      {previewVideo && (
+        <VideoModal
+          url={previewVideo.url}
+          title={previewVideo.title}
+          onClose={() => setPreviewVideo(null)}
+        />
+      )}
+
+      {/* Generated or Manual Quiz Modal */}
+      {generatedQuiz && (
+        <QuizModal
+          quiz={generatedQuiz}
+          videoId={generatedQuiz.videoId}
+          onClose={() => setGeneratedQuiz(null)}
+          onSave={(quiz) => {
+            setGeneratedQuiz(quiz);
+            setQuizzes([...quizzes.filter(q => q.videoId !== quiz.videoId), quiz]);
+          }} // Update local view if they save
         />
       )}
     </div>

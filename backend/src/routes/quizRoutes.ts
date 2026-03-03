@@ -1,34 +1,33 @@
 import express from "express";
 import { requireAuth, requireOrgRole } from "../middleware/auth";
 import {
-  createQuiz,
-  getQuizzesByVideo,
-  getQuizById,
+  generateQuiz,
+  updateQuiz,
+  getQuizByVideo,
+  getQuizzesByCourse,
   submitQuiz,
-  getQuizResults,
 } from "../controllers/quizController";
 
 const router = express.Router();
 
-// Teacher only (ideally)
-router.post("/", requireAuth(), requireOrgRole("org:teacher"), createQuiz);
+// AI Quiz Generation (Teacher only)
+router.post("/generate/:videoId", requireAuth(), requireOrgRole("org:teacher"), generateQuiz);
+
+// Manual Quiz Update (Teacher only)
+router.put("/update/:videoId", requireAuth(), requireOrgRole("org:teacher"), updateQuiz);
 
 // Student/Teacher
-router.get("/video/:videoId", requireAuth(), getQuizzesByVideo);
-router.get("/:quizId", requireAuth(), getQuizById);
+// Student/Teacher - Get the AI generated quiz for a specific video
+router.get("/video/:videoId", requireAuth(), getQuizByVideo);
 
-// Student only
+// Student/Teacher - Get all quizzes for a specific course
+router.get("/course/:courseId", requireAuth(), getQuizzesByCourse);
+
+// Student only - Submit answers & get graded
 router.post(
   "/:quizId/submit",
   requireAuth(),
-  requireOrgRole("org:student"),
   submitQuiz,
-);
-router.get(
-  "/:quizId/results",
-  requireAuth(),
-  requireOrgRole("org:student"),
-  getQuizResults,
 );
 
 export default router;

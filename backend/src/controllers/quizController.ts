@@ -1,91 +1,181 @@
 import type { Request, Response } from "express";
-import Quiz from "../models/Quiz";
-import QuizResult from "../models/QuizResult";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import s3Client from "../config/s3";
+import { GoogleGenAI } from "@google/genai";
 import Video from "../models/Video";
+import Quiz from "../models/Quiz";
+import QuizScore from "../models/QuizScore";
+import Course from "../models/Course";
 
-import Course from "../models/Course"; // Added Course import
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Create Quiz (Teacher)
-export const createQuiz = async (req: Request, res: Response) => {
+// Configure Gemini to output strict JSON matching our Mongoose schema
+// Configure Gemini to output strict JSON matching our Mongoose schema
+const quizSchema = {
+  type: "OBJECT",
+  properties: {
+    title: { type: "STRING", description: "A short, engaging title for this video quiz." },
+    questions: {
+      type: "ARRAY",
+      description: "A list of 3-5 multiple choice questions based on the video.",
+      items: {
+        type: "OBJECT",
+        properties: {
+          questionText: { type: "STRING" },
+          options: { type: "ARRAY", items: { type: "STRING" }, description: "Exactly 4 multiple choice options." },
+          correctAnswerIndex: { type: "INTEGER", description: "The array index (0-3) of the correct option." }
+        },
+        required: ["questionText", "options", "correctAnswerIndex"]
+      }
+    }
+  },
+  required: ["title", "questions"]
+};
+
+// 1. Generate Quiz (Teacher Only)
+export const generateQuiz = async (req: Request, res: Response) => {
   try {
-    const { title, courseId, videoId, questions } = req.body;
+    const { videoId } = req.params;
     const teacherId = (req as any).auth.userId;
 
-    // Verify video exists
     const video = await Video.findById(videoId);
     if (!video) {
       res.status(404).json({ message: "Video not found" });
       return;
     }
 
-    // Verify course belongs to this teacher
-    const course = await Course.findOne({ _id: courseId, teacherId });
+    // Verify ownership
+    const course = await Course.findOne({ _id: video.courseId, teacherId });
     if (!course) {
-      res
-        .status(403)
-        .json({ message: "Forbidden: You do not own the parent course" });
+      res.status(403).json({ message: "Forbidden" });
       return;
     }
 
-    // Verify video actually belongs to this course
-    if (video.courseId?.toString() !== courseId) {
-      res
-        .status(400)
-        .json({
-          message: "Bad Request: Video does not belong to the specified course",
-        });
-      return;
-    }
+    // Generate S3 URL for Gemini
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: video.s3Key,
+    });
+    const videoUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-    const quiz = await Quiz.create({
-      title,
-      courseId,
-      videoId,
-      teacherId,
-      questions,
+    console.log(`Sending Video to Gemini from URL: ${videoUrl.substring(0, 50)}...`);
+
+    // Call Gemini with the Video URL
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Watch this educational video and generate a multiple choice quiz to test a student's comprehension. Respond ONLY in valid JSON matching the schema." },
+            { fileData: { fileUri: videoUrl, mimeType: "video/mp4" } }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: quizSchema,
+        temperature: 0.2, // Low temp for factual questions
+      }
     });
 
-    res.status(201).json(quiz);
-  } catch (error) {
-    console.error("Create Quiz Error:", error);
-    res.status(500).json({ message: "Server error" });
+    const aiText = response.text;
+    if (!aiText) {
+      throw new Error("Gemini returned empty response");
+    }
+
+    const quizData = JSON.parse(aiText);
+
+    // Upsert the Quiz into Database
+    const quiz = await Quiz.findOneAndUpdate(
+      { videoId },
+      {
+        title: quizData.title,
+        courseId: video.courseId,
+        teacherId,
+        questions: quizData.questions
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json(quiz);
+  } catch (error: any) {
+    console.error("Generate Quiz Error:", error);
+    res.status(500).json({ message: "Failed to generate quiz", error: error.message });
   }
 };
 
-// Get Quizzes for a specific Video (Student/Teacher)
-export const getQuizzesByVideo = async (req: Request, res: Response) => {
+// 1.5 Update Quiz Manually (Teacher)
+export const updateQuiz = async (req: Request, res: Response) => {
   try {
     const { videoId } = req.params;
-    const quizzes = await Quiz.find({ videoId });
-    res.json(quizzes);
+    const { title, questions } = req.body;
+    const teacherId = (req as any).auth.userId;
+
+    const video = await Video.findById(videoId);
+    if (!video) {
+      res.status(404).json({ message: "Video not found" });
+      return;
+    }
+
+    // Verify ownership
+    const course = await Course.findOne({ _id: video.courseId, teacherId });
+    if (!course) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    const quiz = await Quiz.findOneAndUpdate(
+      { videoId },
+      {
+        title: title || "Video Quiz",
+        courseId: video.courseId,
+        teacherId,
+        questions
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json(quiz);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Update Quiz Error:", error);
+    res.status(500).json({ message: "Failed to update quiz" });
   }
 };
 
-// Get Specific Quiz (Student) - Exclude correct answers?
-// Actually, detailed view might be needed.
-// For taking the quiz, we might want to hide correct answers if the frontend isn't trusted.
-// But for simplicity, we send the whole object and frontend handles display.
-export const getQuizById = async (req: Request, res: Response) => {
+// 2. Get Video's Quiz (Teacher or Student)
+export const getQuizByVideo = async (req: Request, res: Response) => {
   try {
-    const { quizId } = req.params;
-    const quiz = await Quiz.findById(quizId);
+    const { videoId } = req.params;
+    const quiz = await Quiz.findOne({ videoId });
     if (!quiz) {
-      res.status(404).json({ message: "Quiz not found" });
-      return;
+       res.status(404).json({ message: "Quiz not found for this video" });
+       return;
     }
+
     res.json(quiz);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Submit Quiz (Student)
+// 2.5 Get All Quizzes for a Course
+export const getQuizzesByCourse = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const quizzes = await Quiz.find({ courseId });
+    res.json(quizzes);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// 3. Submit Quiz Attempt (Student Only)
 export const submitQuiz = async (req: Request, res: Response) => {
   try {
     const { quizId } = req.params;
-    const { answers } = req.body; // Array of { questionIndex, selectedOptionIndex }
+    const { answers } = req.body; // Array of selected indexes
     const studentId = (req as any).auth.userId;
 
     const quiz = await Quiz.findById(quizId);
@@ -94,51 +184,39 @@ export const submitQuiz = async (req: Request, res: Response) => {
       return;
     }
 
-    let score = 0;
-    const totalQuestions = quiz.questions.length;
-    const resultAnswers = [];
-
-    for (const ans of answers) {
-      const question = quiz.questions[ans.questionIndex];
-      if (!question) {
-        continue; // Skip invalid questions
+    // Grade it
+    let correctCount = 0;
+    quiz.questions.forEach((q, index) => {
+      if (answers[index] === q.correctAnswerIndex) {
+        correctCount++;
       }
-      const isCorrect = question.correctAnswerIndex === ans.selectedOptionIndex;
-      if (isCorrect) score++;
-
-      resultAnswers.push({
-        questionIndex: ans.questionIndex,
-        selectedOptionIndex: ans.selectedOptionIndex,
-        isCorrect,
-      });
-    }
-
-    const result = await QuizResult.create({
-      quizId,
-      studentId,
-      score,
-      totalQuestions,
-      answers: resultAnswers,
     });
 
-    res.json(result);
+    // Default to 80 if schema isn't updated yet in old docs
+    const passingScore = (quiz as any).passingScore || 80; 
+    const scorePercentage = Math.round((correctCount / quiz.questions.length) * 100);
+    const hasPassed = scorePercentage >= passingScore;
+
+    // Save Attempt
+    const quizScore = await QuizScore.findOneAndUpdate(
+      { quizId, studentId },
+      {
+        $setOnInsert: { videoId: quiz.videoId },
+        $max: { bestScore: scorePercentage },
+        $set: { hasPassed: hasPassed, lastAttemptAt: new Date() },
+        $inc: { attempts: 1 }
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      score: scorePercentage,
+      passed: hasPassed,
+      correctCount,
+      total: quiz.questions.length
+    });
   } catch (error) {
     console.error("Submit Quiz Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Get Results (Student - history)
-export const getQuizResults = async (req: Request, res: Response) => {
-  try {
-    const { quizId } = req.params;
-    const studentId = (req as any).auth.userId;
-
-    const results = await QuizResult.find({ quizId, studentId }).sort({
-      completedAt: -1,
-    });
-    res.json(results);
-  } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
