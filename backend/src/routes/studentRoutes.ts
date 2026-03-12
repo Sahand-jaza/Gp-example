@@ -2,7 +2,7 @@ import express, { type Request, type Response } from "express";
 import { requireOrgRole, requireAuth } from "../middleware/auth";
 import StudentProfile from "../models/StudentProfile";
 import { getAuth } from "@clerk/express";
-import { syncUser } from "../controllers/studentController";
+import { syncUser, getStudentCourses, getStudentCourse, enrollInCourse } from "../controllers/studentController";
 
 const router = express.Router();
 
@@ -47,5 +47,17 @@ router.get(
     }
   },
 );
+
+// GET /api/student/courses
+// Returns all published courses
+router.get("/courses", requireAuth(), requireOrgRole("org:student"), getStudentCourses);
+
+// GET /api/student/courses/:courseId
+// Returns details and videos for a specific course
+router.get("/courses/:courseId", requireAuth(), requireOrgRole("org:student"), getStudentCourse);
+
+// POST /api/student/courses/:courseId/enroll
+// Enrolls a student in a course
+router.post("/courses/:courseId/enroll", requireAuth(), requireOrgRole("org:student"), enrollInCourse);
 
 export default router;

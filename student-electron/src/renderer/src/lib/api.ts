@@ -1,15 +1,26 @@
 import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
+import { useMemo } from 'react';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-});
+export const useApi = () => {
+  const { getToken } = useAuth();
 
-api.interceptors.request.use(async (config) => {
-  const token = await window.Clerk?.session?.getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+  const api = useMemo(() => {
+    const instance = axios.create({
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+    });
 
-export default api;
+    instance.interceptors.request.use(async (config) => {
+      const token = await getToken();
+      if (token && config.headers) {
+        // Fallback for types
+        (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    return instance;
+  }, [getToken]);
+
+  return api;
+};

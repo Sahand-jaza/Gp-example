@@ -4,6 +4,7 @@ import {
   generateQuiz,
   updateQuiz,
   getQuizByVideo,
+  getStudentQuizByVideo,
   getQuizzesByCourse,
   submitQuiz,
 } from "../controllers/quizController";
@@ -16,17 +17,20 @@ router.post("/generate/:videoId", requireAuth(), requireOrgRole("org:teacher"), 
 // Manual Quiz Update (Teacher only)
 router.put("/update/:videoId", requireAuth(), requireOrgRole("org:teacher"), updateQuiz);
 
-// Student/Teacher
-// Student/Teacher - Get the AI generated quiz for a specific video
-router.get("/video/:videoId", requireAuth(), getQuizByVideo);
+// Teacher - Get the AI generated quiz for a specific video
+router.get("/video/:videoId", requireAuth(), requireOrgRole("org:teacher"), getQuizByVideo);
 
-// Student/Teacher - Get all quizzes for a specific course
-router.get("/course/:courseId", requireAuth(), getQuizzesByCourse);
+// Student - Get the quiz for a specific video (strips answers)
+router.get("/student/video/:videoId", requireAuth(), requireOrgRole("org:student"), getStudentQuizByVideo);
+
+// Teacher - Get all quizzes for a specific course
+router.get("/course/:courseId", requireAuth(), requireOrgRole("org:teacher"), getQuizzesByCourse);
 
 // Student only - Submit answers & get graded
 router.post(
   "/:quizId/submit",
   requireAuth(),
+  requireOrgRole("org:student"),
   submitQuiz,
 );
 

@@ -42,6 +42,7 @@ import trackingRoutes from "./routes/trackingRoutes";
 import commentRoutes from "./routes/commentRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import quizRoutes from "./routes/quizRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
 import studentRoutes from "./routes/studentRoutes";
 import { startCronJobs } from "./utils/cron";
 
@@ -53,6 +54,7 @@ app.use("/api/tracking", trackingRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Start Cron
 startCronJobs();

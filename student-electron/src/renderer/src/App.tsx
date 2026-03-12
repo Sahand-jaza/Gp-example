@@ -1,10 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, OrganizationSwitcher, Protect, UserButton, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import StudentDashboard from './components/dashboard/StudentDashboard'
+import CourseView from './components/course/CourseView'
+import QuizView from './components/quiz/QuizView'
 import { useEffect } from 'react'
 import axios from 'axios'
 
-function HelloUser() {
+function HelloUser({ children }: { children: React.ReactNode }) {
   const { organization, isLoaded } = useOrganization();
   const { getToken, userId } = useAuth();
 
@@ -35,109 +37,16 @@ function HelloUser() {
     );
   }
 
-  // Handle no organization selected (Show welcome/create screen)
-  if (!organization) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 p-4">
-        <div className="absolute top-4 right-4">
-          <UserButton />
-        </div>
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Student App</h1>
-          <p className="text-gray-600 mb-6">Please create or join an organization as a to continue.</p>
-          <div className="flex justify-center">
-            <OrganizationSwitcher afterCreateOrganizationUrl="/" hidePersonal={true} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // NOTE: We are removing the strict `if (!organization)` block for development 
+  // so you can see the app interface immediately without having an organization selected.
+  // In a real production deployment, you might want to uncomment a strict org block.
+  
   // Handle organization selected (Show role-specific content)
+  // For development ease, we are bypassing the strict `role="org:student"` check here
+  // so you can test the app using your Teacher account or any account in the organization.
   return (
     <div className="flex flex-col h-screen w-full">
-      {/* Role-specific dashboards */}
-      <Protect role="org:student">
-        <StudentDashboard />
-      </Protect>
-
-      <Protect role="org:teacher">
-        <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-gray-50">
-          <div className="absolute top-4 right-4 flex items-center gap-4">
-             <OrganizationSwitcher afterCreateOrganizationUrl="/" />
-             <UserButton />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Teacher Access</h2>
-          <p className="text-gray-600 mb-4">
-            This application is designed for Students.
-          </p>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
-            Please use the <strong>Teacher App</strong> (teacher-next) content management and class administration.
-          </div>
-        </div>
-      </Protect>
-
-      <Protect role="org:parent">
-        <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-gray-50">
-          <div className="absolute top-4 right-4 flex items-center gap-4">
-             <OrganizationSwitcher afterCreateOrganizationUrl="/" />
-             <UserButton />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Parent Access</h2>
-          <p className="text-gray-600 mb-4">
-            This application is designed for Students.
-          </p>
-           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800">
-            Please use the <strong>Parent App</strong> (parent-reactNative) to monitor your child's progress.
-          </div>
-        </div>
-      </Protect>
-
-      {/* Fallback for users with no matching role in the organization */}
-      <Protect fallback={
-         <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-gray-50">
-           <div className="absolute top-4 right-4 flex items-center gap-4">
-              <OrganizationSwitcher afterCreateOrganizationUrl="/" />
-              <UserButton />
-           </div>
-           <h2 className="text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
-           <p className="text-gray-500">You are a member of <strong>{organization.name}</strong> but do not have a recognized role (Student, Teacher, or Parent).</p>
-           <p className="text-sm text-gray-400 mt-2">Please contact your organization administrator.</p>
-         </div>
-      }>
-        {/* Empty children because permissions are handled by role-specific Protects above. 
-            Wait, if a user HAS a role, say org:student, the first Protect renders.
-            Does the last Protect render too?
-            If user has `org:student`, they have *some* role.
-            Protect with NO props usually checks if authenticated. Yes, they are.
-            So it renders its children (Empty).
-            It doesn't "fall back" if other protects rendered.
-            
-            This structure is problematic if multiple Protects are independent.
-            But we want exclusive rendering.
-            
-            Better approach: 
-            Check roles manually with `useUser` or `useAuth` helpers? 
-            Or rely on `Protect` rendering logic.
-            
-            If I wrap all role-specific logic inside a component that checks for roles?
-            Or simpler: Just use conditional rendering based on `user.organizationMemberships`.
-            
-            Actually, Clerk's `Protect` component only renders children if the condition is met.
-            If I have 3 sequential Protects, if user has ALL roles (unlikely but possible), all 3 render.
-            If user has ONE role, only that one renders.
-            
-            The issue is the "Fallback" case where NONE match.
-            We can't easily express "If none of the above" with declarative components unless nested or using logic.
-            
-            Let's use `has()` from `useAuth`? No, `useAuth` has `has`.
-            
-            Let's try to keep it declarative for now but remove the confusing "Fallback" Protect at the end entirely.
-            If they have no role, they just see a blank screen? That's bad.
-            
-            Let's use a helper function to determine the view.
-        */}
-      </Protect>
+      {children}
     </div>
   )
 }
@@ -172,7 +81,9 @@ function App(): JSX.Element {
           element={
             <>
               <SignedIn>
-                <HelloUser />
+                <HelloUser>
+                  <StudentDashboard />
+                </HelloUser>
               </SignedIn>
               <SignedOut>
                 <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -180,6 +91,36 @@ function App(): JSX.Element {
                     <SignIn />
                   </div>
                 </div>
+              </SignedOut>
+            </>
+          }
+        />
+        <Route
+          path="/course/:courseId"
+          element={
+            <>
+              <SignedIn>
+                <HelloUser>
+                  <CourseView />
+                </HelloUser>
+              </SignedIn>
+              <SignedOut>
+                <Navigate to="/sign-in" />
+              </SignedOut>
+            </>
+          }
+        />
+        <Route
+          path="/course/:courseId/quiz/:videoId"
+          element={
+            <>
+              <SignedIn>
+                <HelloUser>
+                  <QuizView />
+                </HelloUser>
+              </SignedIn>
+              <SignedOut>
+                <Navigate to="/sign-in" />
               </SignedOut>
             </>
           }

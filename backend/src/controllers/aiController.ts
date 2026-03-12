@@ -4,6 +4,13 @@ import StudySession from "../models/StudySession";
 import AiSummary from "../models/AiSummary";
 import StudentProfile from "../models/StudentProfile";
 import ParentProfile from "../models/ParentProfile";
+import Video from "../models/Video";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import s3Client from "../config/s3";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -82,5 +89,70 @@ export const generateLiveSummary = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("AI Error:", error);
     res.status(500).json({ message: "AI generation failed" });
+  }
+};
+
+export const summarizeVideo = async (req: Request, res: Response) => {
+  try {
+    const { videoId } = req.params;
+
+    // 1. Check if we already generated a summary for this video
+    const existingSummary = await AiSummary.findOne({ videoId });
+    if (existingSummary) {
+      res.json({ summary: existingSummary.summaryText });
+      return;
+    }
+
+    // 2. Fetch the Video
+    const video = await Video.findById(videoId);
+    if (!video) {
+       res.status(404).json({ message: "Video not found" });
+       return;
+    }
+
+    // 3. Generate short-lived URL for Gemini to access the video
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: video.s3Key,
+    });
+    const videoUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    
+    console.log(`Sending Video to Gemini for summarization: ${videoUrl.substring(0, 50)}...`);
+
+    // 4. Send to Gemini
+    const prompt = `Watch this educational video and provide a concise, comprehensive summary of its key learning points. Format your response into short, highly-readable bullet points that a student can quickly review. Only return the text summary, no extra conversational preamble. Do not use markdown headers, just return a bulleted list.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { fileData: { fileUri: videoUrl, mimeType: "video/mp4" } }
+          ]
+        }
+      ],
+      config: {
+        temperature: 0.3,
+      }
+    });
+
+    const summaryText = response.text;
+    if (!summaryText) {
+      throw new Error("Gemini returned empty response");
+    }
+
+    // 5. Cache the result
+    await AiSummary.create({
+      videoId,
+      summaryText,
+    });
+
+    // 6. Return to user
+    res.json({ summary: summaryText });
+  } catch (error: any) {
+    console.error("Generate Video Summary Error:", error);
+    res.status(500).json({ message: "Failed to summarize video", error: error.message });
   }
 };

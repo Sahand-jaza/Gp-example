@@ -144,7 +144,7 @@ export const updateQuiz = async (req: Request, res: Response) => {
   }
 };
 
-// 2. Get Video's Quiz (Teacher or Student)
+// 2. Get Video's Quiz (Teacher Only)
 export const getQuizByVideo = async (req: Request, res: Response) => {
   try {
     const { videoId } = req.params;
@@ -155,6 +155,29 @@ export const getQuizByVideo = async (req: Request, res: Response) => {
     }
 
     res.json(quiz);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// 2.1 Get Video's Quiz for Student (Strips correct answers)
+export const getStudentQuizByVideo = async (req: Request, res: Response) => {
+  try {
+    const { videoId } = req.params;
+    const quiz = await Quiz.findOne({ videoId });
+    if (!quiz) {
+       res.status(404).json({ message: "Quiz not found for this video" });
+       return;
+    }
+
+    // Strip correct answers
+    const quizObj = quiz.toObject();
+    quizObj.questions = quizObj.questions.map((q: any) => {
+      delete q.correctAnswerIndex;
+      return q;
+    });
+
+    res.json(quizObj);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
