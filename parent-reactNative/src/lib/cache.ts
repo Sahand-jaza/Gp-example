@@ -1,11 +1,11 @@
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from "react-native";
 
 const createTokenCache = () => {
   return {
     async getToken(key: string) {
       try {
-        const item = await SecureStore.getItemAsync(key);
+        const item = await AsyncStorage.getItem(key);
         if (item) {
           console.log(`${key} was used 🔐 \n`);
         } else {
@@ -13,14 +13,14 @@ const createTokenCache = () => {
         }
         return item;
       } catch (error) {
-        console.error("SecureStore get item error: ", error);
-        await SecureStore.deleteItemAsync(key);
+        console.error("AsyncStorage get item error: ", error);
+        await AsyncStorage.removeItem(key);
         return null;
       }
     },
     async saveToken(key: string, value: string) {
       try {
-        return SecureStore.setItemAsync(key, value);
+        return AsyncStorage.setItem(key, value);
       } catch (err) {
         return;
       }

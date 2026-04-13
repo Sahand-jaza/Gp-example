@@ -7,11 +7,13 @@ import { Course } from "@/types";
 import { Plus, Video, PlayCircle } from "lucide-react";
 import CourseForm from "@/components/dashboard/CourseForm";
 import Link from "next/link";
+import ForbiddenError from "@/components/dashboard/ForbiddenError";
 
 export default function CoursesPage() {
   const api = useApi();
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isForbidden, setIsForbidden] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchCourses = async () => {
@@ -22,7 +24,10 @@ export default function CoursesPage() {
       // Let's assume we add an endpoint GET /api/courses/my-courses in the backend. 
       const res = await api.get("/api/courses/my-courses");
       setCourses(res.data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        setIsForbidden(true);
+      }
       console.error("Failed to fetch courses:", error);
     } finally {
       setIsLoading(false);
@@ -33,6 +38,10 @@ export default function CoursesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchCourses();
   }, [api]);
+
+  if (isForbidden) {
+    return <ForbiddenError />;
+  }
 
   return (
     <div className="flex flex-col flex-1 h-full w-full">

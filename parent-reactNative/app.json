@@ -20,11 +20,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.agilepro.parentreactNative"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "myapp"
+    "scheme": "myapp",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

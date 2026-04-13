@@ -1,5 +1,6 @@
 import { Webhook } from "svix";
 import type { Request, Response } from "express";
+import { clerkClient } from "@clerk/express";
 import User from "../models/User";
 import StudentProfile from "../models/StudentProfile";
 import ParentProfile from "../models/ParentProfile";
@@ -57,7 +58,9 @@ export const handleClerkWebhook = async (req: Request, res: Response) => {
   if (eventType === "user.created" || eventType === "user.updated") {
     const email = evt.data.email_addresses[0].email_address;
     const name = `${evt.data.first_name} ${evt.data.last_name}`.trim();
-    const role = evt.data.public_metadata?.role || "student"; // Default to student if not set
+    const unsafeRole = evt.data.unsafe_metadata?.role;
+    const publicRole = evt.data.public_metadata?.role;
+    const role = unsafeRole || publicRole || "student"; // Default to student if not set
     const permissions = ROLE_PERMISSIONS[role] || [];
 
     try {
@@ -67,6 +70,18 @@ export const handleClerkWebhook = async (req: Request, res: Response) => {
         { upsert: true, new: true },
       );
       console.log(`User synced: ${id} (${role})`);
+
+      // If this is a new signup with a role provided by the frontend, lock it into publicMetadata
+      if (eventType === "user.created" && unsafeRole) {
+        try {
+          await clerkClient.users.updateUserMetadata(id, {
+            publicMetadata: { role: unsafeRole }
+          });
+          console.log(`Clerk publicMetadata updated with role '${unsafeRole}' for user ${id}`);
+        } catch (clerkErr) {
+          console.error("Error updating Clerk metadata:", clerkErr);
+        }
+      }
 
       // Automatically create ParentProfile if role is parent
       if (role === "parent") {

@@ -67,13 +67,16 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
     }
 
     // Check custom user metadata role as a fallback
-    let userRole = (sessionClaims?.metadata as any)?.role || (sessionClaims?.publicMetadata as any)?.role;
+    let userRole = 
+      (sessionClaims?.metadata as any)?.role || 
+      (sessionClaims?.publicMetadata as any)?.role ||
+      (sessionClaims?.unsafeMetadata as any)?.role;
     
     // If we couldn't find it in the session token, fetch it from Clerk API directly
     if (!userRole) {
       try {
         const user = await clerkClient.users.getUser(userId);
-        userRole = user.publicMetadata?.role;
+        userRole = user.publicMetadata?.role || user.unsafeMetadata?.role;
       } catch (err) {
         console.error("Error fetching user from Clerk API:", err);
       }
@@ -87,6 +90,35 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
       userRole === strippedRole ||
       userRole === "admin"
     ) {
+      // Auto-sync role to MongoDB just in case the webhook failed or Ngrok isn't running
+      try {
+        let dbUser = await User.findOne({ clerkId: userId });
+        
+        if (!dbUser) {
+           const clerkUser = await clerkClient.users.getUser(userId);
+           const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+           const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Unknown";
+           const { ROLE_PERMISSIONS } = await import("../config/permissions");
+           
+           dbUser = await User.create({
+             clerkId: userId,
+             email,
+             name,
+             role: userRole || strippedRole,
+             permissions: ROLE_PERMISSIONS[userRole || strippedRole] || []
+           });
+           console.log(`Auto-created missing MongoDB user ${userId} with role ${userRole || strippedRole}`);
+        } else if (userRole && dbUser.role !== userRole) {
+           dbUser.role = userRole;
+           const { ROLE_PERMISSIONS } = await import("../config/permissions");
+           dbUser.permissions = ROLE_PERMISSIONS[userRole] || [];
+           await dbUser.save();
+           console.log(`Auto-synced MongoDB role to ${userRole} for user ${userId}`);
+        }
+      } catch (e) {
+        console.error("Auto-sync MongoDB failed:", e);
+      }
+
       next();
       return;
     }
