@@ -15,6 +15,7 @@ const StudentDashboard = () => {
   const [connectionStatus, setConnectionStatus] = useState<'loading' | 'linked' | 'unlinked'>('loading');
   const [parentCode, setParentCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [studentProfile, setStudentProfile] = useState<any>(null);
 
   const [courses, setCourses] = useState<any[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
@@ -27,14 +28,18 @@ const StudentDashboard = () => {
     const fetchProfile = async () => {
       try {
         const response = await api.get('/student/profile');
-        if (response.data.success && response.data.profile.isLinked) {
-          setConnectionStatus('linked');
-        } else {
-          setConnectionStatus('unlinked');
+        if (response.data.success) {
+          setStudentProfile(response.data.profile);
+          // Check linking status (parentId exists in the new getStudentProfile response)
+          if (response.data.profile.parentId) {
+            setConnectionStatus('linked');
+          } else {
+            setConnectionStatus('unlinked');
+          }
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
-        setConnectionStatus('unlinked'); // Default to unlinked on error for now
+        setConnectionStatus('unlinked');
       }
     };
 
@@ -261,7 +266,7 @@ const StudentDashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <p className="text-sm text-blue-600 font-medium">Courses Enrolled</p>
-                <p className="text-2xl font-bold text-blue-900">0</p>
+                <p className="text-2xl font-bold text-blue-900">{studentProfile?.enrolledCount || 0}</p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                 <p className="text-sm text-green-600 font-medium">Assignments Due</p>
@@ -269,7 +274,7 @@ const StudentDashboard = () => {
               </div>
                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                 <p className="text-sm text-purple-600 font-medium">Completed Quizzes</p>
-                <p className="text-2xl font-bold text-purple-900">0</p>
+                <p className="text-2xl font-bold text-purple-900">{studentProfile?.passedQuizzesCount || 0}</p>
               </div>
             </div>
           </div>

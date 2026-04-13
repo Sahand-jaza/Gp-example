@@ -2,7 +2,7 @@ import express, { type Request, type Response } from "express";
 import { requireOrgRole, requireAuth } from "../middleware/auth";
 import StudentProfile from "../models/StudentProfile";
 import { getAuth } from "@clerk/express";
-import { syncUser, getStudentCourses, getStudentCourse, enrollInCourse } from "../controllers/studentController";
+import { syncUser, getStudentCourses, getStudentCourse, enrollInCourse, getStudentProfile } from "../controllers/studentController";
 
 const router = express.Router();
 
@@ -14,38 +14,9 @@ router.post("/sync", requireAuth(), syncUser);
 // Returns the student's profile and connection status
 router.get(
   "/profile",
+  requireAuth(),
   requireOrgRole("org:student"),
-  async (req: Request, res: Response) => {
-    try {
-      const { userId } = getAuth(req);
-
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-
-      const studentProfile = await StudentProfile.findOne({
-        studentId: userId,
-      });
-
-      if (!studentProfile) {
-        res.status(404).json({ message: "Student profile not found" });
-        return;
-      }
-
-      res.json({
-        success: true,
-        profile: {
-          studentId: studentProfile.studentId,
-          parentId: studentProfile.parentId || null,
-          isLinked: !!studentProfile.parentId,
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching student profile:", error);
-      res.status(500).json({ message: "Server error" });
-    }
-  },
+  getStudentProfile,
 );
 
 // GET /api/student/courses

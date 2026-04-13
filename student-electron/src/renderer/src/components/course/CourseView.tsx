@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { ArrowLeft, PlayCircle, Lock, Sparkles, X, MessageSquare, Send } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
+import FocusMonitor from '../monitoring/FocusMonitor';
 
 export default function CourseView() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -397,6 +398,13 @@ export default function CourseView() {
             </div>
           </div>
         </div>
+      )}
+      {/* Real-time Focus Monitor UI */}
+      {user?.id && (
+        <FocusMonitor
+          studentId={user.id}
+          activeVideoId={activeVideo?._id}
+        />
       )}
     </div>
   );

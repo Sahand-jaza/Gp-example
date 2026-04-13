@@ -17,6 +17,21 @@ interface Student {
   linkedAt: string;
 }
 
+interface QuizScore {
+  videoTitle: string;
+  score: number;
+  passed: boolean;
+  date: string;
+}
+
+interface StudentStats {
+  totalCourses: number;
+  totalVideosPassed: number;
+  totalVideosWatched: number;
+  avgScore: number;
+  recentScores: QuizScore[];
+}
+
 interface LiveStatus {
   focus: number;
   emotion: string;
@@ -51,6 +66,8 @@ export default function DashboardScreen() {
   const [connectionCode, setConnectionCode] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [liveStatus, setLiveStatus] = useState<Record<string, LiveStatus>>({});
+  const [studentStats, setStudentStats] = useState<Record<string, StudentStats>>({});
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,13 +95,39 @@ export default function DashboardScreen() {
       const response = await axios.get(`${API_URL}/parents/students`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.data.success) setStudents(response.data.students);
+      if (response.data.success) {
+        setStudents(response.data.students);
+        // Fetch stats for each student sequentially to ensure token validity
+        for (const s of response.data.students) {
+          console.log(`[DEBUG] Fetching stats for: ${s.studentId}...`);
+          await fetchStudentStats(s.studentId, token);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch students', error);
     } finally {
       setStudentsLoading(false);
     }
   }, [getToken]);
+
+  const fetchStudentStats = async (studentId: string, authToken?: string) => {
+    try {
+      const token = authToken || await getToken();
+      if (!token) return;
+
+      const response = await axios.get(`${API_URL}/parents/students/${studentId}/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setStudentStats(prev => ({
+          ...prev,
+          [studentId]: response.data.stats
+        }));
+      }
+    } catch (error) {
+      console.error(`Failed to fetch stats for ${studentId}`, error);
+    }
+  };
 
   // Subscribe to each student's WebSocket room
   const subscribeToStudent = useCallback((studentId: string) => {
@@ -347,6 +390,90 @@ export default function DashboardScreen() {
                     <Text style={{ fontSize: 12, color: '#cbd5e1', marginTop: 12, fontStyle: 'italic' }}>
                       Open the Student App to see live focus data
                     </Text>
+                  )}
+
+                  {/* Progress Statistics */}
+                  {studentStats[student.studentId] && (
+                    <View style={{ marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>
+                            {studentStats[student.studentId].totalCourses}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginTop: 2 }}>
+                            Courses
+                          </Text>
+                        </View>
+                        <View style={{ width: 1, height: '100%', backgroundColor: '#f1f5f9' }} />
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: '#0f172a' }}>
+                            {studentStats[student.studentId].totalVideosWatched}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginTop: 2 }}>
+                            Videos
+                          </Text>
+                        </View>
+                        <View style={{ width: 1, height: '100%', backgroundColor: '#f1f5f9' }} />
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: '#2563eb' }}>
+                            {studentStats[student.studentId].avgScore}%
+                          </Text>
+                          <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginTop: 2 }}>
+                            Quiz Avg
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Expandable Report Section */}
+                      <TouchableOpacity 
+                        onPress={() => setExpandedStudent(expandedStudent === student.studentId ? null : student.studentId)}
+                        style={{ 
+                          backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, 
+                          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6
+                        }}
+                      >
+                        <Ionicons 
+                          name={expandedStudent === student.studentId ? "chevron-up" : "document-text-outline"} 
+                          size={16} color="#64748b" 
+                        />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748b' }}>
+                          {expandedStudent === student.studentId ? "Hide Report" : "View Recent Scores"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {expandedStudent === student.studentId && (
+                        <View style={{ marginTop: 12, gap: 8 }}>
+                          {studentStats[student.studentId].recentScores.length === 0 ? (
+                            <Text style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 10 }}>No quiz scores yet</Text>
+                          ) : (
+                            studentStats[student.studentId].recentScores.map((score, idx) => (
+                              <View key={idx} style={{ 
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                backgroundColor: '#fdfdfd', padding: 10, borderRadius: 10,
+                                borderWidth: 1, borderColor: '#f1f5f9'
+                              }}>
+                                <View style={{ flex: 1, marginRight: 8 }}>
+                                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }} numberOfLines={1}>
+                                    {score.videoTitle}
+                                  </Text>
+                                  <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                                    {new Date(score.date).toLocaleDateString()}
+                                  </Text>
+                                </View>
+                                <View style={{ 
+                                  backgroundColor: score.passed ? '#dcfce7' : '#fee2e2',
+                                  paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8
+                                }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: score.passed ? '#16a34a' : '#ef4444' }}>
+                                    {score.score}%
+                                  </Text>
+                                </View>
+                              </View>
+                            ))
+                          )}
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
               );

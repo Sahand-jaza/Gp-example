@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 const studentProfileSchema = new mongoose.Schema({
   studentId: { type: String, required: true, ref: "User" },
   parentId: { type: String, ref: "User" },
-  connectionCode: { type: String }, // Optional now, or removed if not needed for student
+  connectionCode: { type: String }, 
+  enrolledCourses: [{ type: mongoose.Schema.Types.ObjectId, ref: "Course" }],
+  completedVideos: [{ type: mongoose.Schema.Types.ObjectId, ref: "Video" }],
   createdAt: { type: Date, default: Date.now },
 });
 

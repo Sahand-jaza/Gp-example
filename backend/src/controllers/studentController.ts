@@ -122,6 +122,16 @@ export const getStudentCourse = async (req: Request, res: Response) => {
       return;
     }
 
+    // Auto-enroll the student if not already enrolled
+    try {
+      await StudentProfile.findOneAndUpdate(
+        { studentId: userId },
+        { $addToSet: { enrolledCourses: courseId } }
+      );
+    } catch (e) {
+      console.error("Auto-enroll error:", e);
+    }
+
     let thumbnailUrl = null;
     if (course.thumbnail) {
       try {
@@ -201,6 +211,39 @@ export const enrollInCourse = async (req: Request, res: Response) => {
     res.json({ success: true, profile: updatedProfile });
   } catch (error) {
     console.error("Enroll Course Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getStudentProfile = async (req: Request, res: Response) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const profile = await StudentProfile.findOne({ studentId: userId });
+    if (!profile) {
+      res.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    const quizScoresCount = await QuizScore.countDocuments({ studentId: userId });
+    const passedQuizzesCount = await QuizScore.countDocuments({ studentId: userId, hasPassed: true });
+
+    res.json({
+      success: true,
+      profile: {
+        ...profile.toObject(),
+        enrolledCount: profile.enrolledCourses?.length || 0,
+        quizzesCount: quizScoresCount,
+        passedQuizzesCount
+      }
+    });
+  } catch (error) {
+    console.error("Get Student Profile Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

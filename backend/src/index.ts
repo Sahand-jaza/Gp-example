@@ -24,6 +24,12 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
 
+// Global Debug Logger for 401 Investigation
+app.use((req, res, next) => {
+  console.log(`[DEBUG] Incoming Request: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // Clerk Middleware
 import { clerkMiddleware, getAuth, clerkClient } from "@clerk/express";
 import {
