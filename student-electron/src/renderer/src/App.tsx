@@ -1,13 +1,14 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, OrganizationSwitcher, Protect, UserButton, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import StudentDashboard from './components/dashboard/StudentDashboard'
 import CourseView from './components/course/CourseView'
 import QuizView from './components/quiz/QuizView'
+import FocusMonitor from './components/monitoring/FocusMonitor'
 import { useEffect } from 'react'
 import axios from 'axios'
 
 function HelloUser({ children }: { children: React.ReactNode }) {
-  const { organization, isLoaded } = useOrganization();
+  const { isLoaded } = useOrganization();
   const { getToken, userId } = useAuth();
 
   useEffect(() => {
@@ -28,7 +29,6 @@ function HelloUser({ children }: { children: React.ReactNode }) {
     syncUser();
   }, [userId, getToken]);
 
-  // Handle loading state
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -37,16 +37,11 @@ function HelloUser({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // NOTE: We are removing the strict `if (!organization)` block for development 
-  // so you can see the app interface immediately without having an organization selected.
-  // In a real production deployment, you might want to uncomment a strict org block.
-  
-  // Handle organization selected (Show role-specific content)
-  // For development ease, we are bypassing the strict `role="org:student"` check here
-  // so you can test the app using your Teacher account or any account in the organization.
   return (
     <div className="flex flex-col h-screen w-full">
       {children}
+      {/* Always-on focus monitor overlay */}
+      {userId && <FocusMonitor studentId={userId} />}
     </div>
   )
 }

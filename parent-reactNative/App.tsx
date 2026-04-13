@@ -3,7 +3,13 @@ import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-expo';
 import { tokenCache } from './src/lib/cache';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, View } from 'react-native';
+
+import WelcomeScreen from './src/screens/WelcomeScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import SignUpScreen from './src/screens/SignUpScreen';
+
+import DashboardScreen from './src/screens/DashboardScreen';
+
 
 const PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 
@@ -13,37 +19,25 @@ if (!PUBLISHABLE_KEY) {
 
 const Stack = createNativeStackNavigator();
 
-function PublicScreen() {
-  return (
-    <View className="flex-1 justify-center items-center bg-gray-50">
-      <Text className="text-xl font-bold">Welcome Parents!</Text>
-      <Text>Please sign in to view your student's progress.</Text>
-    </View>
-  );
-}
-
-function PrivateScreen() {
-  return (
-    <View className="flex-1 justify-center items-center bg-green-50">
-      <Text className="text-xl font-bold text-green-700">Dashboard</Text>
-      <Text>You are successfully signed in!</Text>
-    </View>
-  );
-}
-
 export default function App() {
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={PUBLISHABLE_KEY}>
       <NavigationContainer>
         <SignedIn>
           <Stack.Navigator>
-            <Stack.Screen name="Dashboard" component={PrivateScreen} />
+            <Stack.Screen 
+              name="Dashboard" 
+              component={DashboardScreen} 
+              options={{ headerShown: false }}
+            />
           </Stack.Navigator>
         </SignedIn>
         
         <SignedOut>
-          <Stack.Navigator>
-            <Stack.Screen name="Welcome" component={PublicScreen} />
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
           </Stack.Navigator>
         </SignedOut>
       </NavigationContainer>

@@ -1,30 +1,37 @@
 import type { Request, Response } from "express";
+import { getAuth } from "@clerk/express";
 import StudentProfile from "../models/StudentProfile";
-import User from "../models/User";
 import ParentProfile from "../models/ParentProfile";
 
 export const linkStudentToParent = async (req: Request, res: Response) => {
   try {
     const { connectionCode } = req.body;
-    const studentId = (req as any).auth.userId;
+    const { userId } = getAuth(req);
 
     if (!connectionCode) {
       res.status(400).json({ message: "Connection code is required" });
       return;
     }
 
-    const parentProfile = await ParentProfile.findOne({ connectionCode });
+    const parentProfile = await ParentProfile.findOne({
+      connectionCode: connectionCode.trim().toUpperCase(),
+    });
 
     if (!parentProfile) {
       res.status(404).json({ message: "Invalid connection code" });
       return;
     }
 
-    const studentProfile = await StudentProfile.findOne({ studentId });
+    // Auto-create StudentProfile if it doesn't exist (for local dev without webhooks)
+    let studentProfile = await StudentProfile.findOne({ studentId: userId });
 
     if (!studentProfile) {
-      res.status(404).json({ message: "Student profile not found" });
-      return;
+      console.log(`Auto-creating StudentProfile for user: ${userId}`);
+      const code = `STU-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      studentProfile = await StudentProfile.create({
+        studentId: userId,
+        connectionCode: code,
+      });
     }
 
     if (studentProfile.parentId) {

@@ -82,6 +82,19 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
       }
     }
 
+    // Final fallback: check MongoDB User collection
+    if (!userRole) {
+      try {
+        const dbUser = await User.findOne({ clerkId: userId });
+        if (dbUser) {
+          userRole = dbUser.role;
+          console.log(`Role resolved from MongoDB for user ${userId}: ${userRole}`);
+        }
+      } catch (err) {
+        console.error("Error fetching user from MongoDB:", err);
+      }
+    }
+
     const strippedRole = requiredRole.replace("org:", "");
 
     if (

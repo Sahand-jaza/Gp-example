@@ -44,6 +44,7 @@ import aiRoutes from "./routes/aiRoutes";
 import quizRoutes from "./routes/quizRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import studentRoutes from "./routes/studentRoutes";
+import parentRoutes from "./routes/parentRoutes";
 import { startCronJobs } from "./utils/cron";
 
 app.use("/api/webhooks", webhookRoutes);
@@ -55,6 +56,7 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/parents", parentRoutes);
 
 // Start Cron
 startCronJobs();
@@ -146,7 +148,7 @@ wss.on("connection", (ws) => {
 
       // 2. HEARTBEAT (Student sends data -> Broadcast to Parent)
       if (data.type === "HEARTBEAT") {
-        const { studentId, focus, videoId } = data;
+        const { studentId, focus, videoId, emotion, isTabbedOut } = data;
         const roomName = `student_${studentId}`;
 
         // Broadcast to everyone in this room (Parents)
@@ -154,7 +156,7 @@ wss.on("connection", (ws) => {
           rooms.get(roomName)?.forEach((client) => {
             if (client !== ws && client.readyState === 1) {
               // 1 = OPEN
-              client.send(JSON.stringify({ type: "UPDATE", focus, videoId }));
+              client.send(JSON.stringify({ type: "UPDATE", focus, videoId, emotion, isTabbedOut }));
             }
           });
         }
