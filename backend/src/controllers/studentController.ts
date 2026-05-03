@@ -6,11 +6,23 @@ import ParentProfile from "../models/ParentProfile";
 import { ROLE_PERMISSIONS } from "../config/permissions";
 import Course from "../models/Course";
 import Video from "../models/Video";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { 
+  GetObjectCommand 
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import s3Client from "../config/s3";
+import s3Client from "../config/r2Storage";
 import Quiz from "../models/Quiz";
 import QuizScore from "../models/QuizScore";
+
+// Helper to generate Signed URL for viewing (S3/R2)
+const getSignedViewUrl = async (blobName: string) => {
+  const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: blobName,
+  });
+  return await getSignedUrl(s3Client, command, { expiresIn: 7200 }); // 2 hours
+};
 
 export const syncUser = async (req: Request, res: Response) => {
   try {
@@ -85,11 +97,7 @@ export const getStudentCourses = async (req: Request, res: Response) => {
         let thumbnailUrl = null;
         if (course.thumbnail) {
           try {
-            const command = new GetObjectCommand({
-              Bucket: process.env.AWS_BUCKET_NAME,
-              Key: course.thumbnail,
-            });
-            thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+            thumbnailUrl = await getSignedViewUrl(course.thumbnail);
           } catch (err) {
             console.error("Failed to generate thumbnail url for", course._id);
           }
@@ -135,11 +143,7 @@ export const getStudentCourse = async (req: Request, res: Response) => {
     let thumbnailUrl = null;
     if (course.thumbnail) {
       try {
-        const command = new GetObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: course.thumbnail,
-        });
-        thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        thumbnailUrl = await getSignedViewUrl(course.thumbnail);
       } catch (err) {
         console.error("Failed to generate thumbnail url for", course._id);
       }
@@ -150,17 +154,13 @@ export const getStudentCourse = async (req: Request, res: Response) => {
 
     const videosWithUrls = await Promise.all(
       videos.map(async (v, index) => {
-        const command = new GetObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: v.s3Key,
-        });
-        const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 * 2 });
+        const url = await getSignedViewUrl(v.s3Key);
 
         let isUnlocked = false;
         if (index === 0) {
           isUnlocked = true;
         } else {
-          const prevVideoId = videos[index - 1]._id;
+          const prevVideoId = videos[index - 1]!._id;
           const prevQuiz = await Quiz.findOne({ videoId: prevVideoId });
           if (!prevQuiz) {
             isUnlocked = true; // No quiz on previous video = unlocked

@@ -38,7 +38,7 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
     }
   };
 
-  const uploadToS3 = (url: string, file: File) => {
+  const uploadToR2 = (url: string, file: File) => {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
@@ -53,7 +53,7 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve();
         } else {
-          reject(new Error("Upload to S3 failed."));
+          reject(new Error("Upload failed. Status: " + xhr.status));
         }
       };
 
@@ -61,6 +61,7 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
 
       xhr.open("PUT", url, true);
       xhr.setRequestHeader("Content-Type", file.type);
+      // No extra headers needed for R2 standard PUT upload
       xhr.send(file);
     });
   };
@@ -84,9 +85,9 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
       });
       const { url, key } = signRes.data;
 
-      // 2. Upload directly to S3
-      setStatusText("Uploading to S3...");
-      await uploadToS3(url, file);
+      // 2. Upload directly to Cloudflare R2
+      setStatusText("Uploading to Cloudflare R2...");
+      await uploadToR2(url, file);
 
       // 3. Register video with backend
       setStatusText("Finalizing video details...");

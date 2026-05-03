@@ -5,10 +5,7 @@ import {
 } from 'react-native';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.12:5000/api';
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.1.12:5000';
+import { useApi } from '../lib/api';
 
 interface Student {
   studentId: string;
@@ -40,6 +37,8 @@ interface LiveStatus {
   lastSeen: Date;
 }
 
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.1.103:5000';
+
 const EMOTION_MAP: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
   neutral:   { emoji: '😐', label: 'Focused',    color: '#2563eb', bg: '#dbeafe' },
   happy:     { emoji: '😊', label: 'Happy',      color: '#16a34a', bg: '#dcfce7' },
@@ -61,8 +60,10 @@ function FocusBar({ score }: { score: number }) {
 }
 
 export default function DashboardScreen() {
-  const { signOut, getToken } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
+  const api = useApi();
+  
   const [connectionCode, setConnectionCode] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [liveStatus, setLiveStatus] = useState<Record<string, LiveStatus>>({});
@@ -72,52 +73,12 @@ export default function DashboardScreen() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  
   const wsRefs = useRef<Record<string, WebSocket>>({});
 
-  const fetchProfile = useCallback(async () => {
-    setCodeError(null);
+  const fetchStudentStats = async (studentId: string) => {
     try {
-      const token = await getToken();
-      const response = await axios.get(`${API_URL}/parents/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data.success) setConnectionCode(response.data.profile.connectionCode);
-    } catch (error: any) {
-      setCodeError(error.response?.data?.message || 'Connection Error');
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken]);
-
-  const fetchStudents = useCallback(async () => {
-    try {
-      const token = await getToken();
-      const response = await axios.get(`${API_URL}/parents/students`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data.success) {
-        setStudents(response.data.students);
-        // Fetch stats for each student sequentially to ensure token validity
-        for (const s of response.data.students) {
-          console.log(`[DEBUG] Fetching stats for: ${s.studentId}...`);
-          await fetchStudentStats(s.studentId, token);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch students', error);
-    } finally {
-      setStudentsLoading(false);
-    }
-  }, [getToken]);
-
-  const fetchStudentStats = async (studentId: string, authToken?: string) => {
-    try {
-      const token = authToken || await getToken();
-      if (!token) return;
-
-      const response = await axios.get(`${API_URL}/parents/students/${studentId}/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/parents/students/${studentId}/stats`);
       if (response.data.success) {
         setStudentStats(prev => ({
           ...prev,
@@ -125,13 +86,41 @@ export default function DashboardScreen() {
         }));
       }
     } catch (error) {
-      console.error(`Failed to fetch stats for ${studentId}`, error);
+      // Silent error
     }
   };
 
+  const fetchProfile = useCallback(async () => {
+    setCodeError(null);
+    try {
+      const response = await api.get('/parents/profile');
+      if (response.data.success) setConnectionCode(response.data.profile.connectionCode);
+    } catch (error: any) {
+      setCodeError(error.response?.data?.message || 'Connection Error');
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  const fetchStudents = useCallback(async () => {
+    try {
+      const response = await api.get('/parents/students');
+      if (response.data.success) {
+        setStudents(response.data.students);
+        for (const s of response.data.students) {
+          await fetchStudentStats(s.studentId);
+        }
+      }
+    } catch (error) {
+       // Silent error
+    } finally {
+      setStudentsLoading(false);
+    }
+  }, [api]);
+
   // Subscribe to each student's WebSocket room
   const subscribeToStudent = useCallback((studentId: string) => {
-    if (wsRefs.current[studentId]) return; // already connected
+    if (wsRefs.current[studentId]) return;
 
     const ws = new WebSocket(WS_URL);
     wsRefs.current[studentId] = ws;
@@ -160,19 +149,16 @@ export default function DashboardScreen() {
 
     ws.onclose = () => {
       delete wsRefs.current[studentId];
-      // Reconnect after 5s
       setTimeout(() => subscribeToStudent(studentId), 5000);
     };
 
     ws.onerror = () => ws.close();
   }, []);
 
-  // When students list changes, subscribe to WebSocket for each
   useEffect(() => {
     students.forEach(s => subscribeToStudent(s.studentId));
   }, [students, subscribeToStudent]);
 
-  // Cleanup all websockets on unmount
   useEffect(() => {
     return () => {
       Object.values(wsRefs.current).forEach(ws => ws.close());

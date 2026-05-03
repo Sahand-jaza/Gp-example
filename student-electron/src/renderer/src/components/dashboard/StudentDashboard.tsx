@@ -1,6 +1,5 @@
 import { useUser, useOrganization, UserButton } from '@clerk/clerk-react';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { PlayCircle, Video as VideoIcon, Bell, Check } from 'lucide-react';
@@ -103,8 +102,13 @@ const StudentDashboard = () => {
       alert("Connected to parent successfully!");
     } catch (error: any) {
       console.error('Connection error:', error);
-      // toast.error(error.response?.data?.message || "Failed to connect");
-      alert(error.response?.data?.message || "Failed to connect");
+      const message = error.response?.data?.message || "Failed to connect";
+      
+      if (message.includes("already connected")) {
+        setConnectionStatus('linked');
+      } else {
+        alert(message);
+      }
     } finally {
       setIsSubmitting(false);
     }

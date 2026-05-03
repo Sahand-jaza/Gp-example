@@ -5,11 +5,24 @@ import AiSummary from "../models/AiSummary";
 import StudentProfile from "../models/StudentProfile";
 import ParentProfile from "../models/ParentProfile";
 import Video from "../models/Video";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { 
+  GetObjectCommand 
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import s3Client from "../config/s3";
+import s3Client from "../config/r2Storage";
 import { GoogleGenAI } from "@google/genai";
 
+// Helper to generate Signed URL for viewing (S3/R2)
+const getSignedViewUrl = async (blobName: string) => {
+  const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: blobName,
+  });
+
+  // Generate a signed URL that expires in 1 hour (3600 seconds) for Gemini
+  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+};
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Initialize Gemini
@@ -110,12 +123,8 @@ export const summarizeVideo = async (req: Request, res: Response) => {
        return;
     }
 
-    // 3. Generate short-lived URL for Gemini to access the video
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: video.s3Key,
-    });
-    const videoUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    // 3. Generate Signed URL for Gemini (R2) to access the video
+    const videoUrl = await getSignedViewUrl(video.s3Key);
     
     console.log(`Sending Video to Gemini for summarization: ${videoUrl.substring(0, 50)}...`);
 

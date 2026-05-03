@@ -1,33 +1,53 @@
 import type { Request, Response } from "express";
-import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { 
+  PutObjectCommand, 
+  GetObjectCommand, 
+  DeleteObjectCommand 
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import s3Client from "../config/s3";
+import s3Client from "../config/r2Storage";
 import Course from "../models/Course";
 import Video from "../models/Video";
+
+// Helper to generate Signed URL for viewing (S3/R2)
+const getSignedViewUrl = async (blobName: string) => {
+  const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+  
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: blobName,
+  });
+
+  // Generate a signed URL that expires in 2 hours (7200 seconds)
+  return await getSignedUrl(s3Client, command, { expiresIn: 7200 });
+};
 
 // Get Presigned URL for Upload (Teacher only)
 export const getUploadUrl = async (req: Request, res: Response) => {
   try {
     const { fileName, contentType, folder = "videos" } = req.body;
-    const userId = (req as any).auth.userId; // Ensure this is a teacher in middleware/logic
+    const userId = (req as any).auth.userId;
 
     if (!fileName || !contentType) {
       res.status(400).json({ message: "fileName and contentType required" });
       return;
     }
 
-    const key = `${folder}/${userId}/${Date.now()}-${fileName}`;
+    const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+    const blobName = `${folder}/${userId}/${Date.now()}-${fileName}`;
+    
     const command = new PutObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
+      Bucket: bucketName,
+      Key: blobName,
       ContentType: contentType,
     });
 
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour
+    // Presigned URL for upload (expires in 1 hour)
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-    res.json({ url, key });
+    res.json({ url, key: blobName });
   } catch (error) {
-    console.error("S3 Sign Error:", error);
+    console.error("R2 Sign Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -43,11 +63,7 @@ export const getMyCourses = async (req: Request, res: Response) => {
         let thumbnailUrl = null;
         if (course.thumbnail) {
           try {
-            const command = new GetObjectCommand({
-              Bucket: process.env.AWS_BUCKET_NAME,
-              Key: course.thumbnail,
-            });
-            thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+            thumbnailUrl = await getSignedViewUrl(course.thumbnail);
           } catch (err) {
             console.error("Failed to generate thumbnail url for", course._id);
           }
@@ -69,19 +85,11 @@ export const getCourse = async (req: Request, res: Response) => {
     const { courseId } = req.params;
     const teacherId = (req as any).auth?.userId;
 
-    console.log(`[getCourse] called for courseId: ${courseId}, teacherId: ${teacherId}`);
-
     const course = await Course.findOne({ _id: courseId });
-    console.log(`[getCourse] Course found by ID without teacher check:`, course ? "YES" : "NO", course?.teacherId);
 
     if (!course) {
-      console.log(`[getCourse] Returning 404 - Course totally not found`);
       res.status(404).json({ message: "Course not found" });
       return;
-    }
-
-    if (course.teacherId !== teacherId) {
-       console.log(`[getCourse] Course teacherId ${course.teacherId} !== requesting teacherId ${teacherId}`);
     }
 
     const matchedCourse = await Course.findOne({ _id: courseId, teacherId });
@@ -93,17 +101,12 @@ export const getCourse = async (req: Request, res: Response) => {
     let thumbnailUrl = null;
     if (matchedCourse.thumbnail) {
       try {
-        const command = new GetObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: matchedCourse.thumbnail,
-        });
-        thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        thumbnailUrl = await getSignedViewUrl(matchedCourse.thumbnail);
       } catch (err) {
         console.error("Failed to generate thumbnail url for", matchedCourse._id);
       }
     }
     
-    console.log(`[getCourse] Returning Course seamlessly`);
     res.json({ ...matchedCourse.toObject(), thumbnailUrl });
   } catch (error) {
     console.error(`[getCourse] Error:`, error);
@@ -174,30 +177,32 @@ export const deleteCourse = async (req: Request, res: Response) => {
       return;
     }
 
-    // Get all videos and delete from S3
+    const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+
+    // Get all videos and delete from R2
     const videos = await Video.find({ courseId });
     for (const v of videos) {
       if (v.s3Key) {
         try {
           await s3Client.send(new DeleteObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME,
-            Key: v.s3Key,
+            Bucket: bucketName,
+            Key: v.s3Key
           }));
         } catch (err) {
-          console.error("Failed to delete video from S3:", v.s3Key);
+          console.error("Failed to delete video from R2:", v.s3Key);
         }
       }
     }
 
-    // Delete thumbnail from S3 if exists
+    // Delete thumbnail from R2 if exists
     if (course.thumbnail) {
       try {
         await s3Client.send(new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: course.thumbnail,
+          Bucket: bucketName,
+          Key: course.thumbnail
         }));
       } catch (err) {
-        console.error("Failed to delete thumbnail from S3:", course.thumbnail);
+        console.error("Failed to delete thumbnail from R2:", course.thumbnail);
       }
     }
 
@@ -259,14 +264,7 @@ export const getCourseVideos = async (req: Request, res: Response) => {
     // Generate Signed URLs for each
     const videosWithUrls = await Promise.all(
       videos.map(async (v) => {
-        const command = new GetObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: v.s3Key,
-        });
-
-        const url = await getSignedUrl(s3Client, command, {
-          expiresIn: 3600 * 2,
-        }); // 2 hours
+        const url = await getSignedViewUrl(v.s3Key);
 
         return {
           ...v.toObject(),
@@ -332,15 +330,16 @@ export const deleteVideo = async (req: Request, res: Response) => {
       return;
     }
 
-    // Delete from S3
+    // Delete from R2
     if (video.s3Key) {
       try {
+        const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
         await s3Client.send(new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: video.s3Key,
+          Bucket: bucketName,
+          Key: video.s3Key
         }));
       } catch (err) {
-        console.error("Failed to delete video from S3:", video.s3Key);
+        console.error("Failed to delete video from R2:", video.s3Key);
       }
     }
 

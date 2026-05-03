@@ -18,19 +18,20 @@ export default function ImageUpload({ value, onChange, existingImageUrl }: Image
   const [previewUrl, setPreviewUrl] = useState<string | null>(existingImageUrl || null);
   const [error, setError] = useState("");
 
-  const uploadToS3 = (url: string, file: File) => {
+  const uploadToR2 = (url: string, file: File) => {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve();
         } else {
-          reject(new Error("Upload to S3 failed."));
+          reject(new Error("Upload failed. Status: " + xhr.status));
         }
       };
       xhr.onerror = () => reject(new Error("Network error during upload."));
       xhr.open("PUT", url, true);
       xhr.setRequestHeader("Content-Type", file.type);
+      // No extra headers needed for R2 standard PUT upload
       xhr.send(file);
     });
   };
@@ -56,8 +57,8 @@ export default function ImageUpload({ value, onChange, existingImageUrl }: Image
         });
         const { url, key } = signRes.data;
 
-        // 2. Upload directly to S3
-        await uploadToS3(url, file);
+        // 2. Upload directly to Cloudflare R2
+        await uploadToR2(url, file);
 
         // 3. Set preview and notify parent
         const objectUrl = URL.createObjectURL(file);

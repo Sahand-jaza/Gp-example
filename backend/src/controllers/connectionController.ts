@@ -8,6 +8,11 @@ export const linkStudentToParent = async (req: Request, res: Response) => {
     const { connectionCode } = req.body;
     const { userId } = getAuth(req);
 
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
     if (!connectionCode) {
       res.status(400).json({ message: "Connection code is required" });
       return;

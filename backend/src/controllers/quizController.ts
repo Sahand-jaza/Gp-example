@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { 
+  GetObjectCommand 
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import s3Client from "../config/s3";
+import s3Client from "../config/r2Storage";
 import { GoogleGenAI } from "@google/genai";
 import Video from "../models/Video";
 import Quiz from "../models/Quiz";
@@ -9,6 +11,18 @@ import QuizScore from "../models/QuizScore";
 import Course from "../models/Course";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// Helper to generate Signed URL for viewing (S3/R2)
+const getSignedViewUrl = async (blobName: string) => {
+  const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: blobName,
+  });
+
+  // Generate a signed URL that expires in 1 hour (3600 seconds) for Gemini
+  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+};
 
 // Configure Gemini to output strict JSON matching our Mongoose schema
 // Configure Gemini to output strict JSON matching our Mongoose schema
@@ -52,12 +66,8 @@ export const generateQuiz = async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate S3 URL for Gemini
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: video.s3Key,
-    });
-    const videoUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    // Generate Signed URL for Gemini (R2)
+    const videoUrl = await getSignedViewUrl(video.s3Key);
 
     console.log(`Sending Video to Gemini from URL: ${videoUrl.substring(0, 50)}...`);
 
@@ -172,7 +182,7 @@ export const getStudentQuizByVideo = async (req: Request, res: Response) => {
 
     // Strip correct answers
     const quizObj = quiz.toObject();
-    quizObj.questions = quizObj.questions.map((q: any) => {
+    (quizObj as any).questions = quizObj.questions.map((q: any) => {
       delete q.correctAnswerIndex;
       return q;
     });

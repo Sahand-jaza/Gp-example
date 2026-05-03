@@ -5,7 +5,7 @@ import { useApi } from "../../../lib/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Course } from "@/types";
-import { BookOpen, Video as VideoIcon, Plus } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
 import ForbiddenError from "./ForbiddenError";
 
 export default function TeacherDashboard() {
@@ -22,8 +22,8 @@ export default function TeacherDashboard() {
       try {
         const res = await api.get("/api/courses/my-courses");
         setCourses(res.data);
-      } catch (error: any) {
-        if (error.response?.status === 403 || error.response?.status === 401) {
+    } catch (error: unknown) {
+        if ((error as { response?: { status?: number } }).response?.status === 403 || (error as { response?: { status?: number } }).response?.status === 401) {
           setIsForbidden(true);
         }
         console.error("Failed to fetch courses overview", error);
@@ -40,8 +40,8 @@ export default function TeacherDashboard() {
       // Hitting the test teacher endpoint we discovered in index.ts earlier
       const res = await api.get("/api/test/teacher");
       setTestResult(`Success: ${JSON.stringify(res.data)}`);
-    } catch (error: any) {
-      if (error.response?.status === 403) {
+    } catch (error: unknown) {
+      if ((error as { response?: { status?: number } }).response?.status === 403) {
         setTestResult(`Error: 403 Forbidden - Access Denied`);
         return;
       }

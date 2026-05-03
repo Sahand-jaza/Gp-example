@@ -1,7 +1,7 @@
 "use client";
 
 import { X, Edit2, Plus, Trash2, Save, Loader2 } from "lucide-react";
-import { Quiz, QuizQuestion } from "@/types";
+import { Quiz } from "@/types";
 import { useEffect, useState } from "react";
 import { useApi } from "@/lib/api";
 

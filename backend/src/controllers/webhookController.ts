@@ -34,9 +34,10 @@ export const handleClerkWebhook = async (req: Request, res: Response) => {
 
   let evt: any;
 
-  // Attempt to verify the incoming request
+  // Attempt to verify the incoming request (req.body is a Buffer thanks to express.raw)
+  const payload = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body);
   try {
-    evt = wh.verify(JSON.stringify(req.body), {
+    evt = wh.verify(payload, {
       "svix-id": svix_id,
       "svix-timestamp": svix_timestamp,
       "svix-signature": svix_signature,

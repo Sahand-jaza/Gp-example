@@ -5,21 +5,16 @@ import User from "../models/User";
 // Custom requireAuth middleware that enforces JSON 401 response
 export const requireAuth = () => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { userId, sessionId, getToken } = getAuth(req);
-
-    console.log("Auth Middleware Hit:", {
-      path: req.path,
-      userId,
-      sessionId,
-      headers: req.headers.authorization ? "Present" : "Missing",
-    });
+    const auth = getAuth(req);
+    const userId = auth.userId;
 
     if (!userId) {
-      console.log("Auth Failed: No userId found.");
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
+    // Attach to req for use in subsequent controllers
+    (req as any).userId = userId;
     next();
   };
 };
@@ -66,32 +61,32 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
       return;
     }
 
-    // Check custom user metadata role as a fallback
-    let userRole = 
-      (sessionClaims?.metadata as any)?.role || 
-      (sessionClaims?.publicMetadata as any)?.role ||
-      (sessionClaims?.unsafeMetadata as any)?.role;
-    
-    // If we couldn't find it in the session token, fetch it from Clerk API directly
-    if (!userRole) {
-      try {
-        const user = await clerkClient.users.getUser(userId);
-        userRole = user.publicMetadata?.role || user.unsafeMetadata?.role;
-      } catch (err) {
-        console.error("Error fetching user from Clerk API:", err);
+    // Priority Fix: Always check MongoDB first for the most up-to-date role
+    let userRole: string | null = null;
+    try {
+      const dbUser = await User.findOne({ clerkId: userId }).lean() as any;
+      if (dbUser && dbUser.role) {
+        userRole = dbUser.role;
+        console.log(`[DEBUG] Role prioritized from MongoDB for user ${userId}: ${userRole}`);
       }
+    } catch (err) {
+      console.error("Error fetching user from MongoDB:", err);
     }
 
-    // Final fallback: check MongoDB User collection
+    // Fallback to session claims if not in DB
     if (!userRole) {
-      try {
-        const dbUser = await User.findOne({ clerkId: userId });
-        if (dbUser) {
-          userRole = dbUser.role;
-          console.log(`Role resolved from MongoDB for user ${userId}: ${userRole}`);
+      userRole = 
+        ((sessionClaims?.metadata as any)?.role as string) || 
+        ((sessionClaims?.publicMetadata as any)?.role as string) ||
+        ((sessionClaims?.unsafeMetadata as any)?.role as string);
+      
+      if (!userRole) {
+        try {
+          const user = await clerkClient.users.getUser(userId);
+          userRole = (user.publicMetadata?.role as string) || (user.unsafeMetadata?.role as string);
+        } catch (err) {
+          console.error("Error fetching user from Clerk API:", err);
         }
-      } catch (err) {
-        console.error("Error fetching user from MongoDB:", err);
       }
     }
 
@@ -122,7 +117,7 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
            });
            console.log(`Auto-created missing MongoDB user ${userId} with role ${userRole || strippedRole}`);
         } else if (userRole && dbUser.role !== userRole) {
-           dbUser.role = userRole;
+           dbUser.role = userRole as "parent" | "student" | "teacher" | "admin";
            const { ROLE_PERMISSIONS } = await import("../config/permissions");
            dbUser.permissions = ROLE_PERMISSIONS[userRole] || [];
            await dbUser.save();

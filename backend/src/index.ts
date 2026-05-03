@@ -18,6 +18,10 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
+// Webhook Route needs raw body for Svix
+import webhookRoutes from "./routes/webhookRoutes";
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+
 // Middleware
 app.use(express.json());
 app.use(cors());
@@ -41,7 +45,7 @@ import { PERMISSIONS } from "./config/permissions";
 app.use(clerkMiddleware());
 
 // Routes
-import webhookRoutes from "./routes/webhookRoutes";
+// Webhook routes already mounted above
 import connectionRoutes from "./routes/connectionRoutes";
 import contentRoutes from "./routes/contentRoutes";
 import trackingRoutes from "./routes/trackingRoutes";
@@ -52,8 +56,6 @@ import notificationRoutes from "./routes/notificationRoutes";
 import studentRoutes from "./routes/studentRoutes";
 import parentRoutes from "./routes/parentRoutes";
 import { startCronJobs } from "./utils/cron";
-
-app.use("/api/webhooks", webhookRoutes);
 app.use("/api/connect", connectionRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/courses", contentRoutes);
