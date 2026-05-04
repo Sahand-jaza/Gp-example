@@ -13,7 +13,6 @@ export default clerkMiddleware(async (auth, req) => {
     }
 
     // Check for admin role
-    const { sessionClaims } = await auth();
     let rawRole = 
       (sessionClaims?.metadata as any)?.role || 
       (sessionClaims?.publicMetadata as any)?.role || 
