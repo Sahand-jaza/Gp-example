@@ -11,7 +11,7 @@ import {
   UserCheck,
   ShieldCheck
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, SignOutButton } from "@clerk/nextjs";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -51,7 +51,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-slate-800 p-4 flex items-center justify-between">
+      <div className="border-t border-slate-800 p-4 space-y-4">
         <div className="flex items-center space-x-3">
           <UserButton />
           <div className="text-sm">

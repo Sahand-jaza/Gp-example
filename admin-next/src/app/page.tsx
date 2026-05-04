@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { SignInButton, SignOutButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { ShieldCheck, ArrowRight, AlertCircle, LayoutDashboard } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -31,14 +31,21 @@ function HomeContent() {
         <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
           {!userId ? (
             <SignInButton mode="modal">
-              <button className="text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors">
+              <button className="text-sm font-black text-slate-900 hover:text-blue-700 transition-colors">
                 Sign In
               </button>
             </SignInButton>
           ) : (
-            <Link className="text-sm font-bold text-blue-600 hover:underline underline-offset-4" href="/dashboard">
-              Go to Dashboard
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link className="text-sm font-black text-slate-900 hover:text-blue-700 transition-colors" href="/dashboard">
+                Go to Dashboard
+              </Link>
+              <SignOutButton>
+                <button className="text-sm font-black text-red-600 hover:text-red-700 transition-colors">
+                  Sign Out
+                </button>
+              </SignOutButton>
+            </div>
           )}
         </nav>
       </header>
