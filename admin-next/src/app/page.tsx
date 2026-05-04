@@ -2,7 +2,7 @@
 
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { ShieldCheck, ArrowRight, AlertCircle } from "lucide-react";
+import { ShieldCheck, ArrowRight, AlertCircle, LayoutDashboard } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
