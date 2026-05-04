@@ -87,26 +87,40 @@ export const syncUser = async (req: Request, res: Response) => {
   }
 };
 
+const resolveThumbnail = async (course: any) => {
+  if (course.thumbnailUrl) {
+    if (course.thumbnailUrl.startsWith("http")) return course.thumbnailUrl;
+    const baseUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    return `${baseUrl}${course.thumbnailUrl.startsWith("/") ? "" : "/"}${course.thumbnailUrl}`;
+  }
+  if (course.thumbnail) {
+    try {
+      const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
+      const command = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: course.thumbnail,
+      });
+      return await getSignedUrl(s3Client, command, { expiresIn: 7200 });
+    } catch (err) {
+      console.error("S3 Thumbnail resolve failed:", err);
+    }
+  }
+  return null;
+};
+
 // Get all published courses
 export const getStudentCourses = async (req: Request, res: Response) => {
   try {
     const courses = await Course.find({ isPublished: true }).sort({ createdAt: -1 });
 
-    const coursesWithThumbnails = await Promise.all(
+    const processedCourses = await Promise.all(
       courses.map(async (course) => {
-        let thumbnailUrl = null;
-        if (course.thumbnail) {
-          try {
-            thumbnailUrl = await getSignedViewUrl(course.thumbnail);
-          } catch (err) {
-            console.error("Failed to generate thumbnail url for", course._id);
-          }
-        }
-        return { ...course.toObject(), thumbnailUrl };
+        const finalThumbnailUrl = await resolveThumbnail(course);
+        return { ...course.toObject(), thumbnailUrl: finalThumbnailUrl };
       })
     );
 
-    res.json(coursesWithThumbnails);
+    res.json(processedCourses);
   } catch (error) {
     console.error("Get Student Courses Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -140,14 +154,7 @@ export const getStudentCourse = async (req: Request, res: Response) => {
       console.error("Auto-enroll error:", e);
     }
 
-    let thumbnailUrl = null;
-    if (course.thumbnail) {
-      try {
-        thumbnailUrl = await getSignedViewUrl(course.thumbnail);
-      } catch (err) {
-        console.error("Failed to generate thumbnail url for", course._id);
-      }
-    }
+    const finalThumbnailUrl = await resolveThumbnail(course);
 
     // Fetch videos for course
     const videos = await Video.find({ courseId }).sort({ order: 1, createdAt: 1 });
@@ -178,7 +185,7 @@ export const getStudentCourse = async (req: Request, res: Response) => {
       })
     );
 
-    res.json({ ...course.toObject(), thumbnailUrl, videos: videosWithUrls });
+    res.json({ ...course.toObject(), thumbnailUrl: finalThumbnailUrl, videos: videosWithUrls });
   } catch (error) {
     console.error("Get Student Course Error:", error);
     res.status(500).json({ message: "Server error" });

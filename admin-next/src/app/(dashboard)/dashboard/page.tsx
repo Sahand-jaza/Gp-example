@@ -46,9 +46,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard Overview</h2>
-        <p className="text-slate-500">Welcome back, Admin. Real-time system monitoring is active.</p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Main Overview</h1>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">

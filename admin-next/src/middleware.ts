@@ -13,32 +13,44 @@ export default clerkMiddleware(async (auth, req) => {
     }
 
     // Check for admin role
-    let rawRole = 
-      (sessionClaims?.metadata as any)?.role || 
-      (sessionClaims?.publicMetadata as any)?.role || 
-      (sessionClaims?.unsafeMetadata as any)?.role ||
-      (sessionClaims as any)?.orgRole;
+    let rawRole = "none";
+    let isAdmin = false;
+    
+    // 1. FAST PATH: Check Session Claims first
+    const metadata = (sessionClaims?.metadata as any) || (sessionClaims?.publicMetadata as any) || {};
+    const sessionRole = metadata.role || (sessionClaims as any)?.role || (sessionClaims as any)?.orgRole;
+    
+    if (sessionRole?.toLowerCase() === "admin" || sessionRole?.toLowerCase() === "org:admin") {
+      isAdmin = true;
+      rawRole = sessionRole;
+    }
 
-    let isAdmin = rawRole === "admin" || rawRole === "org:admin";
-
-    // Instant Sync Fix: If not admin in session, check fresh Clerk API state
+    // 2. SLOW PATH: Instant Sync Fix (Only if session is stale)
     if (!isAdmin) {
+      console.log(`[Admin Middleware] ⚠️ STALE SESSION for ${userId}. Performing Fresh API Sync...`);
       try {
         const { clerkClient } = await import("@clerk/nextjs/server");
         const client = await clerkClient();
         const user = await client.users.getUser(userId);
-        rawRole = (user.publicMetadata as any)?.role;
-        isAdmin = rawRole === "admin";
-        console.log(`[Admin Middleware] Fresh API Role Check for ${userId}: ${rawRole}`);
+        
+        const freshRole = (user.publicMetadata as any)?.role;
+        
+        if (freshRole?.toLowerCase() === "admin") {
+          isAdmin = true;
+          rawRole = freshRole;
+          console.log(`[Admin Middleware] ✅ INSTANT SYNC SUCCESS for ${userId}. Role promoted to Admin.`);
+        }
       } catch (err) {
         console.error("[Admin Middleware] Fresh role fetch failed:", err);
       }
     }
 
     if (!isAdmin) {
-      console.warn(`[Admin Middleware] Access denied for user ${userId}. Final Role: ${rawRole}`);
+      console.warn(`[Admin Middleware] ACCESS DENIED for ${userId}. Final Role Found: ${rawRole}`);
       return NextResponse.redirect(new URL("/?error=unauthorized", req.url));
     }
+    
+    console.log(`[Admin Middleware] ACCESS GRANTED for ${userId}. Role: ${rawRole}`);
   }
 });
 

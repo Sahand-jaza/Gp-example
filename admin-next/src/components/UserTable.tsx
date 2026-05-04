@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   Filter, 
@@ -12,15 +12,18 @@ import {
   Power,
   PowerOff,
   ArrowUpDown,
-  Lock
+  Lock,
+  Loader2
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 
 type SortOption = "newest" | "oldest" | "az" | "za";
 
-export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
-  const [users, setUsers] = useState(initialUsers);
+export default function UserTable({ endpoint = "/admin/users", dataKey = "users" }: { endpoint?: string; dataKey?: string }) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
@@ -31,13 +34,62 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
   const [editFormData, setEditFormData] = useState({ name: "", email: "", role: "student" });
   const { getToken } = useAuth();
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch users client-side on mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      setFetchError(null);
+      try {
+        const token = await getToken();
+        const res = await api.get(endpoint, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.success) {
+          setUsers(res.data[dataKey] || res.data.users || []);
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch users:", error);
+        setFetchError(
+          error.response?.data?.message || 
+          error.message || 
+          "Failed to load users. Make sure the backend server is running."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [getToken, endpoint, dataKey]);
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    
+    // Basic validation
+    if (!formData.name || !formData.email || !formData.password) {
+      alert("Error: All fields are required.");
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      alert("Error: Password must be at least 8 characters long.");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const token = await getToken();
+      if (!token) {
+        alert("Error: Your session has expired. Please refresh the page.");
+        return;
+      }
+
       const res = await api.post("/admin/users", formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
       if (res.data && res.data.success) {
         setUsers([res.data.user, ...users]);
         setIsModalOpen(false);
@@ -45,7 +97,10 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
         alert("Success: User account has been created.");
       }
     } catch (error: any) {
-      alert(`Error: ${error.response?.data?.message || error.message}`);
+      console.error("User creation failed:", error);
+      alert(`Error: ${error.response?.data?.message || error.message || "Something went wrong"}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -114,6 +169,29 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+          <p className="mt-3 text-sm font-bold text-slate-500">Loading users...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!isLoading && fetchError && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
+          <p className="text-sm font-bold text-red-700">{fetchError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Main Content — only show when loaded without error */}
+      {!isLoading && !fetchError && (<>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -170,6 +248,7 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
               <tr>
                 <th className="px-6 py-5">User Account</th>
                 <th className="px-6 py-5">Platform Role</th>
+                <th className="px-6 py-5">Connection Key</th>
                 <th className="px-6 py-5">Current Status</th>
                 <th className="px-6 py-5">Joined Date</th>
                 <th className="px-6 py-5 text-right">Actions</th>
@@ -198,6 +277,15 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
                     }`}>
                       {user.role}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {user.connectionCode ? (
+                      <span className="inline-flex rounded-lg px-2 py-1 bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-700 font-mono border border-slate-200">
+                        {user.connectionCode}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs font-bold italic">N/A</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <button 
@@ -303,6 +391,8 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
                 <input 
                   type="password" 
                   required
+                  autoCapitalize="none"
+                  autoComplete="new-password"
                   placeholder="Minimum 8 characters"
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -324,9 +414,14 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
               </div>
               <button 
                 type="submit" 
-                className="w-full mt-4 rounded-xl bg-blue-700 py-4 text-sm font-black text-white shadow-xl shadow-blue-200 hover:bg-blue-800 transition-all"
+                disabled={isSubmitting}
+                className={`w-full mt-4 rounded-xl py-4 text-sm font-black text-white shadow-xl transition-all ${
+                  isSubmitting 
+                    ? 'bg-slate-400 cursor-not-allowed shadow-none' 
+                    : 'bg-blue-700 shadow-blue-200 hover:bg-blue-800'
+                }`}
               >
-                Create Account
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
               </button>
             </form>
           </div>
@@ -389,6 +484,7 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }

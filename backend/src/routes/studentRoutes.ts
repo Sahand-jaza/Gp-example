@@ -1,4 +1,5 @@
-import express, { type Request, type Response } from "express";
+import express from "express";
+import type { Request, Response } from "express";
 import { requireOrgRole, requireAuth } from "../middleware/auth";
 import StudentProfile from "../models/StudentProfile";
 import { getAuth } from "@clerk/express";

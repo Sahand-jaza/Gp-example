@@ -26,9 +26,9 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-slate-900 text-white">
+    <>
       <div className="flex h-20 items-center justify-center border-b border-slate-800">
-        <h1 className="text-2xl font-bold tracking-tight">Edu<span className="text-blue-500">Admin</span></h1>
+        <h1 className="text-xl font-black tracking-tight text-white">Admin portal test</h1>
       </div>
       
       <nav className="flex-1 space-y-1 px-4 py-6">
@@ -60,6 +60,6 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

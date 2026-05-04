@@ -52,27 +52,36 @@ export const getUploadUrl = async (req: Request, res: Response) => {
   }
 };
 
+const resolveThumbnail = async (course: any) => {
+  if (course.thumbnailUrl) {
+    if (course.thumbnailUrl.startsWith("http")) return course.thumbnailUrl;
+    const baseUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    return `${baseUrl}${course.thumbnailUrl.startsWith("/") ? "" : "/"}${course.thumbnailUrl}`;
+  }
+  if (course.thumbnail) {
+    try {
+      return await getSignedViewUrl(course.thumbnail);
+    } catch (err) {
+      console.error("S3 Thumbnail resolve failed:", err);
+    }
+  }
+  return null;
+};
+
 // Get Teacher's Own Courses
 export const getMyCourses = async (req: Request, res: Response) => {
   try {
     const teacherId = (req as any).auth.userId;
     const courses = await Course.find({ teacherId }).sort({ createdAt: -1 });
 
-    const coursesWithThumbnails = await Promise.all(
+    const processedCourses = await Promise.all(
       courses.map(async (course) => {
-        let thumbnailUrl = null;
-        if (course.thumbnail) {
-          try {
-            thumbnailUrl = await getSignedViewUrl(course.thumbnail);
-          } catch (err) {
-            console.error("Failed to generate thumbnail url for", course._id);
-          }
-        }
-        return { ...course.toObject(), thumbnailUrl };
+        const finalThumbnailUrl = await resolveThumbnail(course);
+        return { ...course.toObject(), thumbnailUrl: finalThumbnailUrl };
       })
     );
 
-    res.json(coursesWithThumbnails);
+    res.json(processedCourses);
   } catch (error) {
     console.error("Get My Courses Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -98,16 +107,9 @@ export const getCourse = async (req: Request, res: Response) => {
       return;
     }
     
-    let thumbnailUrl = null;
-    if (matchedCourse.thumbnail) {
-      try {
-        thumbnailUrl = await getSignedViewUrl(matchedCourse.thumbnail);
-      } catch (err) {
-        console.error("Failed to generate thumbnail url for", matchedCourse._id);
-      }
-    }
+    const finalThumbnailUrl = await resolveThumbnail(matchedCourse);
     
-    res.json({ ...matchedCourse.toObject(), thumbnailUrl });
+    res.json({ ...matchedCourse.toObject(), thumbnailUrl: finalThumbnailUrl });
   } catch (error) {
     console.error(`[getCourse] Error:`, error);
     res.status(500).json({ message: "Server error" });
@@ -164,14 +166,22 @@ export const updateCourse = async (req: Request, res: Response) => {
   }
 };
 
-// Delete Course
 export const deleteCourse = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
-    const teacherId = (req as any).auth.userId;
+    const userId = (req as any).userId;
 
-    // Verify course exists and belongs to teacher
-    const course = await Course.findOne({ _id: courseId, teacherId });
+    // Fetch user to check role
+    const user = await User.findOne({ clerkId: userId });
+    const isAdmin = user?.role === "admin";
+
+    // If not admin, verify ownership
+    const query: any = { _id: courseId };
+    if (!isAdmin) {
+      query.teacherId = userId;
+    }
+
+    const course = await Course.findOne(query);
     if (!course) {
       res.status(404).json({ message: "Course not found or unauthorized" });
       return;

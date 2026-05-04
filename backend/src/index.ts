@@ -25,8 +25,12 @@ app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoute
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(morgan("dev"));
+import path from "path";
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Global Debug Logger for 401 Investigation
 app.use((req, res, next) => {
