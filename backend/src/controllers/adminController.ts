@@ -174,9 +174,31 @@ export const updateUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { name, email, role } = req.body;
+
+    // 1. Update Clerk first
+    try {
+      await clerkClient.users.updateUserMetadata(userId, {
+        publicMetadata: { role }
+      });
+      // Also update email/name in Clerk if needed
+      await clerkClient.users.updateUser(userId, {
+        firstName: name.split(" ")[0],
+        lastName: name.split(" ").slice(1).join(" "),
+      });
+    } catch (e) {
+      console.warn("Clerk user update failed:", e);
+    }
+
+    // 2. Update local MongoDB
+    const { ROLE_PERMISSIONS } = await import("../config/permissions");
     const user = await User.findOneAndUpdate(
       { clerkId: userId },
-      { name, email, role },
+      { 
+        name, 
+        email, 
+        role, 
+        permissions: ROLE_PERMISSIONS[role] || [] 
+      },
       { new: true }
     );
     res.json({ success: true, user });

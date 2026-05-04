@@ -12,17 +12,32 @@ export default clerkMiddleware(async (auth, req) => {
       return (await auth()).redirectToSignIn();
     }
 
-    // Check for admin role in various possible metadata locations
-    const rawRole = 
+    // Check for admin role
+    const { sessionClaims } = await auth();
+    let rawRole = 
       (sessionClaims?.metadata as any)?.role || 
       (sessionClaims?.publicMetadata as any)?.role || 
       (sessionClaims?.unsafeMetadata as any)?.role ||
       (sessionClaims as any)?.orgRole;
 
-    const isAdmin = rawRole === "admin" || rawRole === "org:admin";
+    let isAdmin = rawRole === "admin" || rawRole === "org:admin";
+
+    // Instant Sync Fix: If not admin in session, check fresh Clerk API state
+    if (!isAdmin) {
+      try {
+        const { clerkClient } = await import("@clerk/nextjs/server");
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        rawRole = (user.publicMetadata as any)?.role;
+        isAdmin = rawRole === "admin";
+        console.log(`[Admin Middleware] Fresh API Role Check for ${userId}: ${rawRole}`);
+      } catch (err) {
+        console.error("[Admin Middleware] Fresh role fetch failed:", err);
+      }
+    }
 
     if (!isAdmin) {
-      console.warn(`[Admin Middleware] Access denied for user ${userId}. Role: ${rawRole}`);
+      console.warn(`[Admin Middleware] Access denied for user ${userId}. Final Role: ${rawRole}`);
       return NextResponse.redirect(new URL("/?error=unauthorized", req.url));
     }
   }
