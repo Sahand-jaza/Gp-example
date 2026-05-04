@@ -25,14 +25,14 @@ export default function App() {
       <NavigationContainer>
         <SignedIn>
           <Stack.Navigator>
-            <Stack.Screen 
-              name="Dashboard" 
-              component={DashboardScreen} 
+            <Stack.Screen
+              name="Dashboard"
+              component={DashboardScreen}
               options={{ headerShown: false }}
             />
           </Stack.Navigator>
         </SignedIn>
-        
+
         <SignedOut>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
