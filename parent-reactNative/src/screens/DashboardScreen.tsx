@@ -37,7 +37,7 @@ interface LiveStatus {
   lastSeen: Date;
 }
 
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.1.103:5000';
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:5000';
 
 const EMOTION_MAP: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
   neutral:   { emoji: '😐', label: 'Focused',    color: '#2563eb', bg: '#dbeafe' },
@@ -91,28 +91,36 @@ export default function DashboardScreen() {
   };
 
   const fetchProfile = useCallback(async () => {
+    console.log('[DEBUG] Fetching Parent Profile...');
     setCodeError(null);
     try {
       const response = await api.get('/parents/profile');
-      if (response.data.success) setConnectionCode(response.data.profile.connectionCode);
+      console.log('[DEBUG] Parent Profile Response:', response.data);
+      if (response.data.success) {
+        setConnectionCode(response.data.profile.connectionCode);
+      }
     } catch (error: any) {
-      setCodeError(error.response?.data?.message || 'Connection Error');
+      console.error('[DEBUG] Fetch Profile Error:', error.response?.data || error.message);
+      const msg = error.response?.data?.error || error.response?.data?.message || error.message || 'Connection Error';
+      setCodeError(msg);
     } finally {
       setLoading(false);
     }
   }, [api]);
 
   const fetchStudents = useCallback(async () => {
+    console.log('[DEBUG] Fetching Connected Students...');
     try {
       const response = await api.get('/parents/students');
+      console.log('[DEBUG] Connected Students Response:', response.data);
       if (response.data.success) {
         setStudents(response.data.students);
         for (const s of response.data.students) {
           await fetchStudentStats(s.studentId);
         }
       }
-    } catch (error) {
-       // Silent error
+    } catch (error: any) {
+       console.error('[DEBUG] Fetch Students Error:', error.response?.data || error.message);
     } finally {
       setStudentsLoading(false);
     }
@@ -209,7 +217,8 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView
-        style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Connection Code Card */}
@@ -467,6 +476,9 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        <View style={{ marginTop: 20, padding: 10, alignItems: 'center', opacity: 0.3 }}>
+          <Text style={{ fontSize: 10, color: '#94a3b8' }}>API: {api.defaults.baseURL}</Text>
+        </View>
         <View style={{ height: 80 }} />
       </ScrollView>
     </SafeAreaView>

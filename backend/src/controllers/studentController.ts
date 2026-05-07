@@ -156,6 +156,13 @@ export const getStudentCourse = async (req: Request, res: Response) => {
       videos.map(async (v, index) => {
         const url = await getSignedViewUrl(v.s3Key);
 
+        const quiz = await Quiz.findOne({ videoId: v._id });
+        const passedScore = await QuizScore.findOne({
+          studentId: userId,
+          videoId: v._id,
+          hasPassed: true,
+        });
+
         let isUnlocked = false;
         if (index === 0) {
           isUnlocked = true;
@@ -163,18 +170,22 @@ export const getStudentCourse = async (req: Request, res: Response) => {
           const prevVideoId = videos[index - 1]!._id;
           const prevQuiz = await Quiz.findOne({ videoId: prevVideoId });
           if (!prevQuiz) {
-            isUnlocked = true; // No quiz on previous video = unlocked
+            isUnlocked = true;
           } else {
-            const passedScore = await QuizScore.findOne({
+            const prevPassedScore = await QuizScore.findOne({
               studentId: userId,
               videoId: prevVideoId,
               hasPassed: true,
             });
-            isUnlocked = !!passedScore;
+            isUnlocked = !!prevPassedScore;
           }
         }
 
-        return { ...v.toObject(), url, isUnlocked };
+        const isCompleted = !!passedScore || (!quiz && index < videos.length - 1 && index !== videos.length - 1); 
+        // Note: Logic for 'no quiz' completion might need a specific 'Watched' record, 
+        // but for now we'll rely on passedScore.
+
+        return { ...v.toObject(), url, isUnlocked, isCompleted };
       })
     );
 

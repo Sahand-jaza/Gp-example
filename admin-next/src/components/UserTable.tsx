@@ -181,11 +181,11 @@ export default function UserTable({ initialUsers }: { initialUsers: any[] }) {
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <div className="h-11 w-11 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center font-black text-slate-700 uppercase">
-                        {user.name?.[0] || user.email[0]}
+                        {user.name?.[0] || user.email?.[0] || "?"}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-black text-slate-900 leading-tight">{user.name || "Unnamed User"}</div>
-                        <div className="text-xs font-bold text-slate-500 mt-0.5">{user.email}</div>
+                        <div className="text-xs font-bold text-slate-500 mt-0.5">{user.email || "No email"}</div>
                       </div>
                     </div>
                   </td>
