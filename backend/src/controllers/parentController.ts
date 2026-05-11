@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { clerkClient } from "@clerk/express";
+import { getAuth, clerkClient } from "@clerk/express";
 import ParentProfile from "../models/ParentProfile";
 import StudentProfile from "../models/StudentProfile";
 import User from "../models/User";
@@ -14,7 +14,7 @@ const generateConnectionCode = () => {
 
 export const getParentProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const { userId } = getAuth(req);
 
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
@@ -53,7 +53,7 @@ export const getParentProfile = async (req: Request, res: Response) => {
 
 export const getConnectedStudents = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const { userId } = getAuth(req);
 
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
@@ -90,7 +90,7 @@ export const getConnectedStudents = async (req: Request, res: Response) => {
 
 export const getStudentStats = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const { userId } = getAuth(req);
     const { studentId } = req.params;
 
     if (!userId) {

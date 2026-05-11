@@ -162,6 +162,11 @@ export const getStudentCourse = async (req: Request, res: Response) => {
           videoId: v._id,
           hasPassed: true,
         });
+        // For quiz-free videos, check the completedVideos array on the student profile
+        const studentProfile = await StudentProfile.findOne({ studentId: userId });
+        const completedCheck = studentProfile?.completedVideos?.some(
+          (id) => id.toString() === v._id.toString()
+        );
 
         let isUnlocked = false;
         if (index === 0) {
@@ -170,7 +175,11 @@ export const getStudentCourse = async (req: Request, res: Response) => {
           const prevVideoId = videos[index - 1]!._id;
           const prevQuiz = await Quiz.findOne({ videoId: prevVideoId });
           if (!prevQuiz) {
-            isUnlocked = true;
+            // No quiz on previous video — unlock if it's in completedVideos
+            const prevCompleted = studentProfile?.completedVideos?.some(
+              (id) => id.toString() === prevVideoId.toString()
+            );
+            isUnlocked = !!prevCompleted;
           } else {
             const prevPassedScore = await QuizScore.findOne({
               studentId: userId,
@@ -181,9 +190,8 @@ export const getStudentCourse = async (req: Request, res: Response) => {
           }
         }
 
-        const isCompleted = !!passedScore || (!quiz && index < videos.length - 1 && index !== videos.length - 1); 
-        // Note: Logic for 'no quiz' completion might need a specific 'Watched' record, 
-        // but for now we'll rely on passedScore.
+        // isCompleted: passed the quiz OR (no quiz AND marked watched in completedVideos)
+        const isCompleted = !!passedScore || (!quiz && !!completedCheck);
 
         return { ...v.toObject(), url, isUnlocked, isCompleted };
       })
@@ -255,6 +263,42 @@ export const getStudentProfile = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get Student Profile Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Mark a quiz-free video as completed (watched >= 95%)
+export const markVideoComplete = async (req: Request, res: Response) => {
+  try {
+    const { videoId } = req.params;
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const video = await Video.findById(videoId);
+    if (!video) {
+      res.status(404).json({ message: "Video not found" });
+      return;
+    }
+
+    // Only mark as complete if there's no quiz attached (quiz-free flow)
+    const quiz = await Quiz.findOne({ videoId });
+    if (quiz) {
+      res.status(400).json({ message: "This video has a quiz. Complete the quiz to mark it as done." });
+      return;
+    }
+
+    await StudentProfile.findOneAndUpdate(
+      { studentId: userId },
+      { $addToSet: { completedVideos: videoId } }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Mark Video Complete Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

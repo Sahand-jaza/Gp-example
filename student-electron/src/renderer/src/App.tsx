@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, useAuth, Authenti
 import StudentDashboard from './components/dashboard/StudentDashboard'
 import CourseView from './components/course/CourseView'
 import QuizView from './components/quiz/QuizView'
-import FocusMonitor from './components/monitoring/FocusMonitor'
+
 import { useEffect } from 'react'
 import axios from 'axios'
 
@@ -40,8 +40,6 @@ function HelloUser({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen w-full">
       {children}
-      {/* Always-on focus monitor overlay */}
-      {userId && <FocusMonitor studentId={userId} />}
     </div>
   )
 }

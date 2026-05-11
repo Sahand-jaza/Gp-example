@@ -23,6 +23,7 @@ const quizSchema = new mongoose.Schema({
     required: true,
   },
   questions: [questionSchema],
+  passingScore: { type: Number, default: 80 },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -106,7 +106,7 @@ export default function DashboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, []); // Exclude api to prevent infinite fetch loop
 
   const fetchStudents = useCallback(async () => {
     console.log('[DEBUG] Fetching Connected Students...');
@@ -124,7 +124,7 @@ export default function DashboardScreen() {
     } finally {
       setStudentsLoading(false);
     }
-  }, [api]);
+  }, []); // Exclude api to prevent infinite fetch loop
 
   // Subscribe to each student's WebSocket room
   const subscribeToStudent = useCallback((studentId: string) => {

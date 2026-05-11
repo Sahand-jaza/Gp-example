@@ -55,6 +55,7 @@ export default function useFocusMonitor({ studentId, activeVideoId, onFocusUpdat
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isMountedRef = useRef(true); // Guard against reconnect after unmount
 
   const [state, setState] = useState<FocusState>({
     isConnected: false,
@@ -147,6 +148,7 @@ export default function useFocusMonitor({ studentId, activeVideoId, onFocusUpdat
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     const connect = () => {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
@@ -158,14 +160,17 @@ export default function useFocusMonitor({ studentId, activeVideoId, onFocusUpdat
       };
       ws.onclose = () => {
         setState(s => ({ ...s, isConnected: false }));
-        // Reconnect after 5s
-        setTimeout(connect, 5000);
+        // Only reconnect if the component is still mounted
+        if (isMountedRef.current) {
+          setTimeout(connect, 5000);
+        }
       };
       ws.onerror = () => ws.close();
     };
 
     connect();
     return () => {
+      isMountedRef.current = false;
       wsRef.current?.close();
     };
   }, [studentId]);

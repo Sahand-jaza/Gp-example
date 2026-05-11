@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import StudySession from "../models/StudySession";
 import AiSummary from "../models/AiSummary";
 import StudentProfile from "../models/StudentProfile";
@@ -12,6 +11,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/r2Storage";
 import { GoogleGenAI } from "@google/genai";
 
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
 // Helper to generate Signed URL for viewing (S3/R2)
 const getSignedViewUrl = async (blobName: string) => {
   const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
@@ -19,14 +20,10 @@ const getSignedViewUrl = async (blobName: string) => {
     Bucket: bucketName,
     Key: blobName,
   });
-
-  // Generate a signed URL that expires in 1 hour (3600 seconds) for Gemini
+  // 1 hour expiry for Gemini access
   return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 };
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export const generateLiveSummary = async (req: Request, res: Response) => {
   try {
@@ -93,11 +90,13 @@ export const generateLiveSummary = async (req: Request, res: Response) => {
       Do not use markdown.
     `;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { temperature: 0.3 }
+    });
 
+    const text = response.text ?? "";
     res.json({ summary: text });
   } catch (error) {
     console.error("AI Error:", error);

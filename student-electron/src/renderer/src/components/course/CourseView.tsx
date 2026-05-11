@@ -39,6 +39,7 @@ export default function CourseView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const maxTimeReached = useRef(0);
+  const hasMarkedComplete = useRef(false); // Prevent duplicate /complete calls
 
   // Sync fullscreen state
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function CourseView() {
     setSummaryText(null);
     setIsSummarizeModalOpen(false);
     setIsQuizAvailable(activeVideo?.isCompleted || false);
+    hasMarkedComplete.current = false; // Reset on video change
     
     if (activeVideo?.isCompleted) {
       // If already completed, allow free seeking by setting max reached to a high value
@@ -85,7 +87,7 @@ export default function CourseView() {
         .then(res => setComments(res.data))
         .catch(err => console.error("Error fetching comments:", err));
     }
-  }, [activeVideo?._id, api]);
+  }, [activeVideo?._id]); // Intentionally excludes `api` — it's a stable memoized instance
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,8 +206,20 @@ export default function CourseView() {
                         if (time > maxTimeReached.current) {
                           maxTimeReached.current = time;
                         }
+                        // Unlock quiz at 95% watched
                         if (videoRef.current.duration && (maxTimeReached.current / videoRef.current.duration) > 0.95) {
                           setIsQuizAvailable(true);
+                          // For quiz-free videos, also persist completion to backend once
+                          if (!hasMarkedComplete.current && !activeVideo?.isCompleted) {
+                            hasMarkedComplete.current = true;
+                            api.post(`/student/videos/${activeVideo?._id}/complete`)
+                              .catch(err => {
+                                // Silently ignore if video has a quiz (backend returns 400)
+                                if (err.response?.status !== 400) {
+                                  console.error('Failed to mark video complete:', err);
+                                }
+                              });
+                          }
                         }
                       }
                     }}
@@ -285,7 +299,11 @@ export default function CourseView() {
 
                       <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3 group/volume">
-                          <button onClick={() => setIsMuted(!isMuted)} className="opacity-70 hover:opacity-100 transition-opacity">
+                          <button onClick={() => {
+                            const newMuted = !isMuted;
+                            setIsMuted(newMuted);
+                            if (videoRef.current) videoRef.current.muted = newMuted;
+                          }} className="opacity-70 hover:opacity-100 transition-opacity">
                             {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
                           </button>
                           <input 
@@ -510,7 +528,7 @@ export default function CourseView() {
                       }
                       setActiveVideo(video);
                     }}
-                    className={`w-full text-left p-4 rounded-2xl flex items-start gap-4 transition-all duration-300 group/item ${
+                    className={`relative w-full text-left p-4 rounded-2xl flex items-start gap-4 transition-all duration-300 group/item ${
                       isActive 
                         ? 'bg-blue-600 shadow-lg shadow-blue-500/20 translate-x-1' 
                         : isUnlocked 

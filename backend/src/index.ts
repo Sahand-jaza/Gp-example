@@ -24,15 +24,22 @@ app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoute
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGIN
+    ? process.env.ALLOWED_ORIGIN.split(',')
+    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
+  credentials: true,
+}));
 app.use(helmet());
 app.use(morgan("dev"));
 
-// Global Debug Logger for 401 Investigation
-app.use((req, res, next) => {
-  console.log(`[DEBUG] Incoming Request: ${req.method} ${req.originalUrl}`);
-  next();
-});
+// Debug request logger (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`[DEBUG] Incoming Request: ${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
 
 // Clerk Middleware
 import { clerkMiddleware, getAuth, clerkClient } from "@clerk/express";

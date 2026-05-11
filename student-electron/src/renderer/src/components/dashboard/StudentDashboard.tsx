@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { PlayCircle, Video as VideoIcon, Bell, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import FocusMonitor from '../monitoring/FocusMonitor';
 
 const StudentDashboard = () => {
   const { user } = useUser();
@@ -173,6 +174,7 @@ const StudentDashboard = () => {
   }
 
   return (
+    <>
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm p-6">
@@ -327,6 +329,9 @@ const StudentDashboard = () => {
         </div>
       </main>
     </div>
+    {/* Focus monitor runs on dashboard too (no active video) */}
+    {user?.id && <FocusMonitor studentId={user.id} />}
+  </>
   );
 };
 

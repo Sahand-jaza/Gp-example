@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { getAuth } from "@clerk/express";
 import { 
   GetObjectCommand 
 } from "@aws-sdk/client-s3";
@@ -51,7 +52,7 @@ const quizSchema = {
 export const generateQuiz = async (req: Request, res: Response) => {
   try {
     const { videoId } = req.params;
-    const teacherId = (req as any).auth.userId;
+    const { userId: teacherId } = getAuth(req);
 
     const video = await Video.findById(videoId);
     if (!video) {
@@ -121,7 +122,7 @@ export const updateQuiz = async (req: Request, res: Response) => {
   try {
     const { videoId } = req.params;
     const { title, questions } = req.body;
-    const teacherId = (req as any).auth.userId;
+    const { userId: teacherId } = getAuth(req);
 
     const video = await Video.findById(videoId);
     if (!video) {
@@ -209,7 +210,12 @@ export const submitQuiz = async (req: Request, res: Response) => {
   try {
     const { quizId } = req.params;
     const { answers } = req.body; // Array of selected indexes
-    const studentId = (req as any).auth.userId;
+    const { userId: studentId } = getAuth(req);
+
+    if (!studentId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
 
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
@@ -225,18 +231,18 @@ export const submitQuiz = async (req: Request, res: Response) => {
       }
     });
 
-    // Default to 80 if schema isn't updated yet in old docs
-    const passingScore = (quiz as any).passingScore || 80; 
+    const passingScore = quiz.passingScore ?? 80;
     const scorePercentage = Math.round((correctCount / quiz.questions.length) * 100);
     const hasPassed = scorePercentage >= passingScore;
 
-    // Save Attempt
+    // Save Attempt — hasPassed can only ever be upgraded (true), never downgraded back to false
     const quizScore = await QuizScore.findOneAndUpdate(
       { quizId, studentId },
       {
         $setOnInsert: { videoId: quiz.videoId },
         $max: { bestScore: scorePercentage },
-        $set: { hasPassed: hasPassed, lastAttemptAt: new Date() },
+        $set: { lastAttemptAt: new Date() },
+        ...(hasPassed ? { $set: { hasPassed: true, lastAttemptAt: new Date() } } : {}),
         $inc: { attempts: 1 }
       },
       { new: true, upsert: true }
