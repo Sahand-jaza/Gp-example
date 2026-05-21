@@ -5,7 +5,7 @@ import User from "../models/User.js";
 
 dotenv.config({ path: ".env" });
 
-const CLERK_ID = "user_3DIMbMGfmCcrXNiLOX2JgSY8eH7";
+const CLERK_ID = "user_3DnswJYEZjkSzPi0OaAS8L4GS9i";
 const ROLE = "admin";
 
 async function promote() {

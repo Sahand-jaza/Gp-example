@@ -31,7 +31,9 @@ router.post(
   endSession,
 );
 
-// Teacher/Parent/Student (But for now, usually requested for a specific student id; we can leave as auth only if others need to view, but if strictly student sending data, it's student)
+// Fix #5: Teachers/Parents/Admins can request analytics for a specific student.
+// Controller enforces: students see only their own data, unknown roles are blocked.
 router.get("/analytics/:studentId", requireAuth(), getStudentAnalytics);
 
 export default router;
+

@@ -8,19 +8,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/r2Storage";
 import Course from "../models/Course";
 import Video from "../models/Video";
+import { getSignedViewUrl } from "../utils/s3";
 
-// Helper to generate Signed URL for viewing (S3/R2)
-const getSignedViewUrl = async (blobName: string) => {
-  const bucketName = process.env.R2_BUCKET_NAME || "gp-container";
-  
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: blobName,
-  });
-
-  // Generate a signed URL that expires in 2 hours (7200 seconds)
-  return await getSignedUrl(s3Client, command, { expiresIn: 7200 });
-};
 
 // Get Presigned URL for Upload (Teacher only)
 export const getUploadUrl = async (req: Request, res: Response) => {
@@ -83,7 +72,9 @@ export const getMyCourses = async (req: Request, res: Response) => {
 export const getCourse = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
-    const teacherId = (req as any).auth?.userId;
+    const teacherId = (req as any).auth?.userId || (req as any).userId;
+    const userRole = (req as any).userRole; // Set by middleware
+    const isAdmin = userRole === "admin" || userRole === "org:admin";
 
     const course = await Course.findOne({ _id: courseId });
 
@@ -92,11 +83,13 @@ export const getCourse = async (req: Request, res: Response) => {
       return;
     }
 
-    const matchedCourse = await Course.findOne({ _id: courseId, teacherId });
-    if (!matchedCourse) {
-      res.status(404).json({ message: "Course not found or unauthorized" });
+    // Bypass check if admin, otherwise enforce ownership
+    if (!isAdmin && course.teacherId !== teacherId) {
+      res.status(403).json({ message: "Unauthorized access to this course" });
       return;
     }
+    
+    const matchedCourse = course;
     
     let thumbnailUrl = null;
     if (matchedCourse.thumbnail) {
@@ -127,7 +120,7 @@ export const createCourse = async (req: Request, res: Response) => {
       thumbnail,
     });
 
-    res.status(201).json(course);
+    res.status(201).json({ success: true, course });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -158,7 +151,7 @@ export const updateCourse = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(course);
+    res.json({ success: true, course });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -168,12 +161,20 @@ export const updateCourse = async (req: Request, res: Response) => {
 export const deleteCourse = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
-    const teacherId = (req as any).auth.userId;
+    const userRole = (req as any).userRole;
+    const isAdmin = userRole === "admin" || userRole === "org:admin";
 
-    // Verify course exists and belongs to teacher
-    const course = await Course.findOne({ _id: courseId, teacherId });
+    // Verify course exists
+    const course = await Course.findOne({ _id: courseId });
     if (!course) {
-      res.status(404).json({ message: "Course not found or unauthorized" });
+      res.status(404).json({ message: "Course not found" });
+      return;
+    }
+
+    // Bypass check if admin, otherwise enforce ownership
+    const userId = (req as any).userId;
+    if (!isAdmin && course.teacherId !== userId) {
+      res.status(403).json({ message: "Unauthorized: You do not own this course" });
       return;
     }
 
@@ -210,7 +211,7 @@ export const deleteCourse = async (req: Request, res: Response) => {
     await Video.deleteMany({ courseId });
     await Course.deleteOne({ _id: courseId });
 
-    res.json({ message: "Course deleted successfully" });
+    res.json({ success: true, message: "Course deleted successfully" });
   } catch (error) {
     console.error("Delete Course Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -247,7 +248,7 @@ export const addVideoToCourse = async (req: Request, res: Response) => {
       order: newOrder,
     });
 
-    res.status(201).json(video);
+    res.status(201).json({ success: true, video });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -305,7 +306,7 @@ export const updateVideo = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(video);
+    res.json({ success: true, video });
   } catch (error) {
     console.error("Update Video Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -344,7 +345,7 @@ export const deleteVideo = async (req: Request, res: Response) => {
     }
 
     await Video.deleteOne({ _id: videoId });
-    res.json({ message: "Video deleted successfully" });
+    res.json({ success: true, message: "Video deleted successfully" });
   } catch (error) {
     console.error("Delete Video Error:", error);
     res.status(500).json({ message: "Server error" });

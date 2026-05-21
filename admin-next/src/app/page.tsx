@@ -1,17 +1,24 @@
 "use client";
 
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { SignInButton, SignOutButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { ShieldCheck, ArrowRight, AlertCircle, LayoutDashboard } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { useEffect, useState } from "react";
+
 function HomeContent() {
+  const [isMounted, setIsMounted] = useState(false);
   const { userId, isLoaded } = useAuth();
   const searchParams = useSearchParams();
   const isUnauthorized = searchParams.get("error") === "unauthorized";
 
-  if (!isLoaded) {
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isLoaded || !isMounted) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -36,18 +43,32 @@ function HomeContent() {
               </button>
             </SignInButton>
           ) : (
-            <Link className="text-sm font-bold text-blue-600 hover:underline underline-offset-4" href="/dashboard">
-              Go to Dashboard
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link className="text-sm font-bold text-blue-600 hover:underline underline-offset-4" href="/dashboard">
+                Go to Dashboard
+              </Link>
+              <SignOutButton signOutOptions={{ redirectUrl: "/" }}>
+                <button className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors">
+                  Sign Out
+                </button>
+              </SignOutButton>
+            </div>
           )}
         </nav>
       </header>
       <main className="flex-1">
         {isUnauthorized && (
           <div className="bg-red-50 p-4 border-b border-red-200">
-            <div className="container mx-auto flex items-center justify-center gap-2 text-red-700 font-bold">
-              <AlertCircle className="h-5 w-5" />
-              Access Denied: Your account does not have Administrator permissions.
+            <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-4 text-red-700 font-bold">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Access Denied: Your account does not have Administrator permissions.
+              </div>
+              <SignOutButton signOutOptions={{ redirectUrl: "/" }}>
+                <button className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-red-700 transition-all shadow-sm shadow-red-200">
+                  Sign Out to Switch Account
+                </button>
+              </SignOutButton>
             </div>
           </div>
         )}
@@ -97,7 +118,11 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense>
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    }>
       <HomeContent />
     </Suspense>
   );

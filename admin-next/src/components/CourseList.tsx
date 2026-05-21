@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { 
   BookOpen, 
   Plus, 
   MoreVertical,
   Layers,
   GraduationCap,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
@@ -37,6 +39,24 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
     }
   };
 
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm("Are you sure you want to delete this course? This will remove all videos and cannot be undone.")) return;
+    
+    try {
+      const token = await getToken();
+      const res = await api.delete(`/courses/${courseId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        setCourses(courses.filter((c: any) => c._id !== courseId));
+        alert("Course deleted successfully.");
+      }
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Failed to delete course.");
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -56,8 +76,16 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {courses.length > 0 ? courses.map((course: any) => (
           <div key={course._id} className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden flex flex-col sm:flex-row">
-            <div className="w-full sm:w-48 bg-slate-100 flex items-center justify-center p-8">
-              <BookOpen className="h-16 w-16 text-slate-400" />
+            <div className="w-full sm:w-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+              {course.thumbnailUrl ? (
+                <img 
+                  src={course.thumbnailUrl} 
+                  alt={course.title} 
+                  className="absolute inset-0 h-full w-full object-cover transition-transform hover:scale-110 duration-500"
+                />
+              ) : (
+                <BookOpen className="h-16 w-16 text-slate-400" />
+              )}
             </div>
             <div className="flex-1 p-6">
               <div className="flex justify-between items-start mb-2">
@@ -65,8 +93,11 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
                   <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{course.category || "General"}</span>
                   <h3 className="text-xl font-bold text-slate-900">{course.title}</h3>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600">
-                  <MoreVertical className="h-5 w-5" />
+                <button 
+                  onClick={() => handleDeleteCourse(course._id)}
+                  className="text-slate-400 hover:text-red-600 transition-colors"
+                >
+                  <Trash2 className="h-5 w-5" />
                 </button>
               </div>
               
@@ -96,9 +127,12 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
                   <span className="text-slate-500">Created: </span>
                   <span className="font-bold text-slate-900">{new Date(course.createdAt).toLocaleDateString()}</span>
                 </div>
-                <button className="text-sm font-bold text-blue-600 hover:text-blue-500">
+                <Link 
+                  href={`/courses/${course._id}`}
+                  className="text-sm font-bold text-blue-600 hover:text-blue-500"
+                >
                   View Full Details
-                </button>
+                </Link>
               </div>
             </div>
           </div>

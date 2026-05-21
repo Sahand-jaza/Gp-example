@@ -27,7 +27,7 @@ app.use(express.json());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGIN
     ? process.env.ALLOWED_ORIGIN.split(',')
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
   credentials: true,
 }));
 app.use(helmet());
@@ -140,8 +140,35 @@ app.get(
 // Store rooms: key = "student_ID", value = Set<WebSocket>
 const rooms = new Map<string, Set<any>>();
 
-wss.on("connection", (ws) => {
-  console.log("New WebSocket Connection");
+// Fix #9: Helper to verify Clerk JWT from WebSocket handshake query param
+async function verifyWsToken(token: string | null): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const { verifyToken } = await import("@clerk/backend");
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    });
+    return payload.sub ?? null; // sub = clerkId
+  } catch (error: any) {
+    console.error("[WS] Token verification failed:", error);
+    require('fs').appendFileSync('ws-error.log', `Error: ${error.message}\nToken: ${token}\n`);
+    return null;
+  }
+}
+
+wss.on("connection", async (ws, req) => {
+  // Fix #9: Extract and verify Clerk JWT from ?token= query param
+  const url = new URL(req.url || "/", `http://${req.headers.host}`);
+  const token = url.searchParams.get("token");
+  const verifiedUserId = await verifyWsToken(token);
+
+  if (!verifiedUserId) {
+    console.warn("[WS] Unauthenticated connection rejected");
+    ws.close(1008, "Unauthorized"); // 1008 = Policy Violation
+    return;
+  }
+
+  console.log(`New WebSocket Connection: user ${verifiedUserId}`);
 
   // Track current room for this socket
   let currentRoom: string | null = null;
@@ -166,6 +193,13 @@ wss.on("connection", (ws) => {
       // 2. HEARTBEAT (Student sends data -> Broadcast to Parent)
       if (data.type === "HEARTBEAT") {
         const { studentId, focus, videoId, emotion, isTabbedOut } = data;
+
+        // Fix #9: Ensure the heartbeat sender is the actual student (not a forged studentId)
+        if (studentId !== verifiedUserId) {
+          console.warn(`[WS] HEARTBEAT spoofing attempt: ${verifiedUserId} sent as ${studentId}`);
+          return;
+        }
+
         const roomName = `student_${studentId}`;
 
         // Broadcast to everyone in this room (Parents)
@@ -193,6 +227,7 @@ wss.on("connection", (ws) => {
     console.log("WebSocket Disconnected");
   });
 });
+
 
 const PORT = process.env.PORT || 5000;
 

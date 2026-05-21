@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { ArrowLeft, PlayCircle, Lock, Sparkles, X, MessageSquare, Send, Play, Pause, Volume2, VolumeX, Maximize, Minimize, CheckCircle2 } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
-import FocusMonitor from '../monitoring/FocusMonitor';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import { useRef } from 'react';
 
 export default function CourseView() {
@@ -11,6 +10,9 @@ export default function CourseView() {
   const navigate = useNavigate();
   const api = useApi();
   const { user } = useUser();
+  const { getToken } = useAuth(); // Fix #9: for WS auth
+
+  const [clerkToken, setClerkToken] = useState<string | undefined>(undefined);
 
   const [course, setCourse] = useState<any>(null);
   const [activeVideo, setActiveVideo] = useState<any>(null);
@@ -41,6 +43,11 @@ export default function CourseView() {
   const maxTimeReached = useRef(0);
   const hasMarkedComplete = useRef(false); // Prevent duplicate /complete calls
 
+  // Fix #9: Fetch Clerk token for WebSocket authentication
+  useEffect(() => {
+    getToken().then(t => setClerkToken(t ?? undefined));
+  }, [getToken]);
+
   // Sync fullscreen state
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -59,10 +66,11 @@ export default function CourseView() {
     
     if (activeVideo?.isCompleted) {
       // If already completed, allow free seeking by setting max reached to a high value
-      maxTimeReached.current = 999999; 
+      maxTimeReached.current = 9999999; 
     } else {
       maxTimeReached.current = 0; // Reset progress for new video
     }
+    setIsQuizAvailable(activeVideo?.isCompleted || false);
   }, [activeVideo?._id, activeVideo?.isCompleted]);
 
   const handleSummarize = async () => {
@@ -224,7 +232,8 @@ export default function CourseView() {
                       }
                     }}
                     onSeeking={() => {
-                      if (videoRef.current && videoRef.current.currentTime > maxTimeReached.current) {
+                      // Only restrict seeking if it's the first time watching (not completed)
+                      if (!activeVideo?.isCompleted && videoRef.current && videoRef.current.currentTime > maxTimeReached.current) {
                         videoRef.current.currentTime = maxTimeReached.current;
                       }
                     }}
@@ -640,13 +649,6 @@ export default function CourseView() {
             </div>
           </div>
         </div>
-      )}
-      {/* Real-time Focus Monitor UI */}
-      {user?.id && (
-        <FocusMonitor
-          studentId={user.id}
-          activeVideoId={activeVideo?._id}
-        />
       )}
     </div>
   );

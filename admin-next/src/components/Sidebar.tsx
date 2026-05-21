@@ -11,7 +11,7 @@ import {
   UserCheck,
   ShieldCheck
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, SignOutButton } from "@clerk/nextjs";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -26,7 +26,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-slate-900 text-white">
+    <div className="flex h-screen w-64 shrink-0 flex-col bg-slate-900 text-white">
       <div className="flex h-20 items-center justify-center border-b border-slate-800">
         <h1 className="text-2xl font-bold tracking-tight">Edu<span className="text-blue-500">Admin</span></h1>
       </div>
@@ -51,14 +51,21 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-slate-800 p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+      <div className="border-t border-slate-800 p-4 space-y-4">
+        <div className="flex items-center space-x-3 px-2">
           <UserButton />
           <div className="text-sm">
-            <p className="font-semibold text-slate-100">Admin Account</p>
-            <p className="text-xs text-slate-400">Administrator</p>
+            <p className="font-semibold text-slate-100 line-clamp-1">Admin Account</p>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Administrator</p>
           </div>
         </div>
+        
+        <SignOutButton signOutOptions={{ redirectUrl: "/" }}>
+          <button className="flex w-full items-center rounded-xl px-4 py-3 text-sm font-bold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300 group">
+            <LogOut className="mr-3 h-5 w-5 transition-transform group-hover:-translate-x-1" />
+            Sign Out
+          </button>
+        </SignOutButton>
       </div>
     </div>
   );

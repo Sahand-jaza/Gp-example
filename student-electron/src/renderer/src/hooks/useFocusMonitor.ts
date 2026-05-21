@@ -23,6 +23,7 @@ export interface FocusState {
 interface Props {
   studentId: string;
   activeVideoId?: string;
+  getToken?: () => Promise<string | null>; // Fix #9: Fetch fresh Clerk JWT for WebSocket authentication
   onFocusUpdate?: (state: Pick<FocusState, 'focusScore' | 'emotion' | 'faceDetected'>) => void;
 }
 
@@ -47,7 +48,7 @@ function getDominantEmotion(expressions: faceapi.FaceExpressions): Emotion {
   );
 }
 
-export default function useFocusMonitor({ studentId, activeVideoId, onFocusUpdate }: Props): {
+export default function useFocusMonitor({ studentId, activeVideoId, getToken, onFocusUpdate }: Props): {
   state: FocusState;
   videoRef: React.RefObject<HTMLVideoElement>;
 } {
@@ -148,32 +149,54 @@ export default function useFocusMonitor({ studentId, activeVideoId, onFocusUpdat
   }, []);
 
   useEffect(() => {
-    isMountedRef.current = true;
-    const connect = () => {
-      const ws = new WebSocket(WS_URL);
+    let isActive = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const connect = async () => {
+      // Fix #9: Fetch a fresh token for every connection attempt to prevent JWT expiration errors
+      const freshToken = getToken ? await getToken() : null;
+      if (!freshToken) {
+        // If we can't get a token, try again later
+        timeoutId = setTimeout(connect, 5000);
+        return;
+      }
+
+      if (!isActive) return;
+
+      const wsUrl = `${WS_URL}?token=${encodeURIComponent(freshToken)}`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!isActive) {
+          ws.close();
+          return;
+        }
         setState(s => ({ ...s, isConnected: true }));
         ws.send(JSON.stringify({ type: 'JOIN_ROOM', studentId }));
         console.log('[FocusMonitor] WS connected, joined room for', studentId);
       };
+
       ws.onclose = () => {
+        if (!isActive) return;
         setState(s => ({ ...s, isConnected: false }));
-        // Only reconnect if the component is still mounted
-        if (isMountedRef.current) {
-          setTimeout(connect, 5000);
-        }
+        timeoutId = setTimeout(connect, 5000);
       };
+
       ws.onerror = () => ws.close();
     };
 
     connect();
+
     return () => {
-      isMountedRef.current = false;
-      wsRef.current?.close();
+      isActive = false;
+      clearTimeout(timeoutId);
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Prevent reconnect on cleanup
+        wsRef.current.close();
+      }
     };
-  }, [studentId]);
+  }, [studentId, getToken]);
 
   // ─── 4. Detection loop ────────────────────────────────────────────────────
   useEffect(() => {

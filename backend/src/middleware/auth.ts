@@ -74,12 +74,6 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
     }
 
     // Fallback to session claims if not in DB
-    if (!userRole) {
-      userRole = 
-        ((sessionClaims?.metadata as any)?.role as string) || 
-        ((sessionClaims?.publicMetadata as any)?.role as string) ||
-        ((sessionClaims?.unsafeMetadata as any)?.role as string);
-      
       if (!userRole) {
         try {
           const user = await clerkClient.users.getUser(userId);
@@ -88,7 +82,9 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
           console.error("Error fetching user from Clerk API:", err);
         }
       }
-    }
+
+    // Attach to request for use in controllers
+    (req as any).userRole = userRole;
 
     const strippedRole = requiredRole.replace("org:", "");
 

@@ -3,13 +3,15 @@ import { SignedIn, SignedOut, SignIn, SignUp, useOrganization, useAuth, Authenti
 import StudentDashboard from './components/dashboard/StudentDashboard'
 import CourseView from './components/course/CourseView'
 import QuizView from './components/quiz/QuizView'
+import FocusMonitor from './components/monitoring/FocusMonitor'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 
 function HelloUser({ children }: { children: React.ReactNode }) {
   const { isLoaded } = useOrganization();
   const { getToken, userId } = useAuth();
+  const [isSynced, setIsSynced] = useState(false);
 
   useEffect(() => {
     const syncUser = async () => {
@@ -22,6 +24,8 @@ function HelloUser({ children }: { children: React.ReactNode }) {
           console.log("User synced with MongoDB");
         } catch (error) {
           console.error("Sync failed:", error);
+        } finally {
+          setIsSynced(true);
         }
       }
     };
@@ -29,7 +33,7 @@ function HelloUser({ children }: { children: React.ReactNode }) {
     syncUser();
   }, [userId, getToken]);
 
-  if (!isLoaded) {
+  if (!isLoaded || !isSynced) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -40,6 +44,8 @@ function HelloUser({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen w-full">
       {children}
+      {/* Global Focus Monitoring - active on all pages */}
+      {userId && <FocusMonitor studentId={userId} getToken={getToken} />}
     </div>
   )
 }

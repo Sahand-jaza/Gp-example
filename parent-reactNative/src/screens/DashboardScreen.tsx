@@ -60,7 +60,7 @@ function FocusBar({ score }: { score: number }) {
 }
 
 export default function DashboardScreen() {
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { user } = useUser();
   const api = useApi();
   
@@ -127,10 +127,19 @@ export default function DashboardScreen() {
   }, []); // Exclude api to prevent infinite fetch loop
 
   // Subscribe to each student's WebSocket room
-  const subscribeToStudent = useCallback((studentId: string) => {
+  const subscribeToStudent = useCallback(async (studentId: string) => {
     if (wsRefs.current[studentId]) return;
+    
+    // Fetch fresh token to prevent JWT expiration errors
+    const freshToken = await getToken();
+    if (!freshToken) {
+      setTimeout(() => subscribeToStudent(studentId), 5000);
+      return;
+    }
 
-    const ws = new WebSocket(WS_URL);
+    // Fix #9: Pass Clerk token as query param for server-side WS authentication
+    const wsUrl = `${WS_URL}?token=${encodeURIComponent(freshToken)}`;
+    const ws = new WebSocket(wsUrl);
     wsRefs.current[studentId] = ws;
 
     ws.onopen = () => {
@@ -161,7 +170,7 @@ export default function DashboardScreen() {
     };
 
     ws.onerror = () => ws.close();
-  }, []);
+  }, [getToken]);
 
   useEffect(() => {
     students.forEach(s => subscribeToStudent(s.studentId));

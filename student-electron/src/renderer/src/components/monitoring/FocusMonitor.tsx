@@ -39,10 +39,11 @@ function FocusRing({ score }: { score: number }) {
 interface Props {
   studentId: string;
   activeVideoId?: string;
+  getToken?: () => Promise<string | null>; // Fix #9: forwarded to useFocusMonitor for WS auth
 }
 
-export default function FocusMonitor({ studentId, activeVideoId }: Props) {
-  const { state, videoRef } = useFocusMonitor({ studentId, activeVideoId });
+export default function FocusMonitor({ studentId, activeVideoId, getToken }: Props) {
+  const { state, videoRef } = useFocusMonitor({ studentId, activeVideoId, getToken });
 
   const emotion = EMOTION_CONFIG[state.emotion] ?? EMOTION_CONFIG.absent;
   const statusColor = state.faceDetected ? '#22c55e' : '#ef4444';

@@ -36,12 +36,25 @@ export const syncUser = async (req: Request, res: Response) => {
     // Fetch user details from Clerk directly to ensure validity and get latest info
     const clerkUser = await clerkClient.users.getUser(userId);
 
-    const email = clerkUser.emailAddresses[0]?.emailAddress;
-    const name =
-      `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
+    const email = clerkUser.emailAddresses[0]?.emailAddress || `clerk_${userId}@noemail.com`;
+    const fullName = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
+    const name = fullName || clerkUser.username || "New Student";
+    
     // Use role from metadata or valid default
-    const role = (clerkUser.publicMetadata?.role as string) || "student";
-    const permissions = ROLE_PERMISSIONS[role] || [];
+    let role = (clerkUser.publicMetadata?.role as string);
+    
+    // If no role exists in Clerk, set it to 'student' automatically
+    if (!role) {
+      role = "student";
+      await clerkClient.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          role: "student"
+        }
+      });
+      console.log(`[AUTH] Assigned default 'student' role to user ${userId} in Clerk`);
+    }
+
+    const permissions = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS["student"];
 
     // Upsert User
     const user = await User.findOneAndUpdate(

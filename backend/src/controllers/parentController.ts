@@ -21,6 +21,17 @@ export const getParentProfile = async (req: Request, res: Response) => {
       return;
     }
 
+    // Ensure role is set in Clerk metadata
+    const clerkUser = await clerkClient.users.getUser(userId);
+    if (!clerkUser.publicMetadata?.role) {
+      await clerkClient.users.updateUserMetadata(userId, {
+        publicMetadata: {
+          role: "parent"
+        }
+      });
+      console.log(`[AUTH] Assigned default 'parent' role to user ${userId} in Clerk`);
+    }
+
     let profile = await ParentProfile.findOne({ parentId: userId });
 
     // Auto-create profile if it doesn't exist (for local dev without webhooks)
@@ -71,15 +82,35 @@ export const getConnectedStudents = async (req: Request, res: Response) => {
 
     const userMap = new Map(users.map((u) => [u.clerkId, u]));
 
-    const students = linkedProfiles.map((profile) => {
-      const user = userMap.get(profile.studentId);
+    const students = await Promise.all(linkedProfiles.map(async (profile) => {
+      let user = userMap.get(profile.studentId);
+      let name = "Student (Pending Sync)";
+      let email = "";
+
+      if (user) {
+        name = (user.name && user.name !== "Unknown") ? user.name : (user.email || "Unnamed Student");
+        email = user.email || "";
+      } else {
+        // Fallback: Fetch directly from Clerk if not in our DB yet
+        try {
+          const clerkUser = await clerkClient.users.getUser(profile.studentId);
+          const fullName = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
+          name = fullName || clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || "New Student";
+          email = clerkUser.emailAddresses[0]?.emailAddress || "";
+          
+          // Optional: You could even trigger a background sync here if you wanted
+        } catch (e) {
+          console.error(`Failed to fetch Clerk user ${profile.studentId}:`, e);
+        }
+      }
+
       return {
         studentId: profile.studentId,
-        name: user?.name || "Unknown Student",
-        email: user?.email || "",
+        name,
+        email,
         linkedAt: profile.createdAt,
       };
-    });
+    }));
 
     res.json({ success: true, students });
   } catch (error) {

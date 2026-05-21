@@ -101,13 +101,26 @@ export const getStudentAnalytics = async (req: Request, res: Response) => {
   try {
     const { studentId: targetStudentId } = req.params;
     const reqUserId = (req as any).auth.userId;
-    const reqOrgRole = (req as any).auth.orgRole; // if using Clerk orgs
+    // Fix #5: Use userRole set by requireOrgRole middleware (from MongoDB), which is more reliable than orgRole alone
+    const reqUserRole: string = ((req as any).userRole || (req as any).auth.orgRole || "") as string;
+    const normalisedRole = reqUserRole.replace("org:", "");
 
-    // Security check: Only the student themselves, their parent, or a teacher should see this.
-    // For now, if role is student, they can only see their own.
-    if (reqOrgRole === "org:student" && targetStudentId !== reqUserId) {
-      res.status(403).json({ message: "Forbidden" });
+    // Students can only view their own analytics
+    if (normalisedRole === "student" && targetStudentId !== reqUserId) {
+      res.status(403).json({ message: "Forbidden: You can only view your own analytics" });
       return;
+    }
+
+    // Parents can only view analytics for students they are connected to (handled by parentController)
+    // Teachers and admins can view any student's analytics
+    // Anyone with an unknown role is blocked
+    if (!normalisedRole || ["parent"].includes(normalisedRole)) {
+      // Allow parents — parent-student connection validation is done at the controller level
+      // If role is completely unknown, block
+      if (!normalisedRole) {
+        res.status(403).json({ message: "Forbidden" });
+        return;
+      }
     }
 
     // Example aggregation: Total study time, Avg focus

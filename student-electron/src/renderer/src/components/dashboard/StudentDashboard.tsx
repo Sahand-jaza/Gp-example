@@ -1,4 +1,4 @@
-import { useUser, useOrganization, UserButton } from '@clerk/clerk-react';
+import { useUser, useOrganization, UserButton, useAuth } from '@clerk/clerk-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
@@ -9,6 +9,7 @@ import FocusMonitor from '../monitoring/FocusMonitor';
 const StudentDashboard = () => {
   const { user } = useUser();
   const { organization } = useOrganization();
+  const { getToken } = useAuth(); // Fix #9: get Clerk token for WS auth
   const navigate = useNavigate();
   const api = useApi();
   
@@ -30,15 +31,14 @@ const StudentDashboard = () => {
         const response = await api.get('/student/profile');
         if (response.data.success) {
           setStudentProfile(response.data.profile);
-          // Check linking status (parentId exists in the new getStudentProfile response)
           if (response.data.profile.parentId) {
             setConnectionStatus('linked');
           } else {
             setConnectionStatus('unlinked');
           }
         }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
+      } catch (error: any) {
+        console.error('Error fetching profile:', error, error.response?.data);
         setConnectionStatus('unlinked');
       }
     };
@@ -99,11 +99,10 @@ const StudentDashboard = () => {
       await api.post('/connect/link', { connectionCode: parentCode });
       setConnectionStatus('linked');
       setParentCode('');
-      // toast.success("Connected to parent!");
       alert("Connected to parent successfully!");
     } catch (error: any) {
-      console.error('Connection error:', error);
-      const message = error.response?.data?.message || "Failed to connect";
+      console.error('Connection error:', error, error.response?.data);
+      const message = error.response?.data?.message || error.response?.data?.error || "Failed to connect";
       
       if (message.includes("already connected")) {
         setConnectionStatus('linked');
@@ -127,11 +126,7 @@ const StudentDashboard = () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50 p-6">
         <div className="absolute top-4 right-4 flex items-center gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{organization?.name}</p>
-            <p className="text-xs text-gray-500">Organization</p>
-          </div>
-          <UserButton />
+          <UserButton afterSignOutUrl="/" />
         </div>
         
         <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 max-w-md w-full text-center">
@@ -175,17 +170,25 @@ const StudentDashboard = () => {
 
   return (
     <>
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm p-6">
+      <header className="bg-white shadow-sm p-4 md:p-6 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Student Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Student Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500 hidden sm:block">
               Welcome back, {user?.firstName} {user?.lastName}
             </p>
           </div>
-          <div className="text-right flex items-center gap-6">
+          <div className="flex items-center gap-2 md:gap-6">
+             {/* Connection Code Badge */}
+             {studentProfile?.connectionCode && (
+               <div className="flex items-center px-2 py-1 md:px-3 md:py-1.5 bg-blue-50 border border-blue-100 rounded-lg">
+                 <span className="hidden lg:inline text-[10px] font-bold text-blue-500 uppercase tracking-wider mr-2">Link Code</span>
+                 <span className="text-xs md:text-sm font-black text-blue-700 tracking-widest select-all">{studentProfile.connectionCode}</span>
+               </div>
+             )}
+
              {/* Notification Bell */}
              <div className="relative">
                <button 
@@ -204,9 +207,9 @@ const StudentDashboard = () => {
                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                    <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                      <h3 className="font-bold text-gray-900">Notifications</h3>
-                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                       {unreadCount} New
-                     </span>
+                     <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600">
+                       <Check size={16} />
+                     </button>
                    </div>
                    <div className="max-h-96 overflow-y-auto">
                      {notifications.length === 0 ? (
@@ -233,17 +236,6 @@ const StudentDashboard = () => {
                                {format(new Date(notif.createdAt), 'MMM d, h:mm a')}
                              </p>
                            </div>
-                           {!notif.isRead && (
-                             <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                markNotificationRead(notif._id);
-                              }}
-                              className="text-gray-300 hover:text-emerald-500 transition-colors"
-                             >
-                               <Check size={16} />
-                             </button>
-                           )}
                          </div>
                        ))
                      )}
@@ -252,74 +244,85 @@ const StudentDashboard = () => {
                )}
              </div>
 
-             <div className="flex items-center gap-4">
-               <div className="hidden sm:block">
-                 <p className="text-sm font-medium text-gray-900">{organization?.name}</p>
-                 <p className="text-xs text-gray-500">Organization</p>
+             <div className="flex items-center gap-3">
+               <div className="hidden lg:block text-right">
+                 <p className="text-sm font-bold text-gray-900">{organization?.name || 'Education'}</p>
+                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Organization</p>
                </div>
-               <UserButton />
+               <UserButton afterSignOutUrl="/" />
              </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Recent Activity / Overview Card */}
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-100 col-span-1 md:col-span-2 lg:col-span-2">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">My Overview</h2>
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Overview Card */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">My Learning Overview</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <p className="text-sm text-blue-600 font-medium">Courses Enrolled</p>
-                <p className="text-2xl font-bold text-blue-900">{studentProfile?.enrolledCount || 0}</p>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Enrolled</p>
+                <p className="text-3xl font-black text-blue-900">{studentProfile?.enrolledCount || 0}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                <p className="text-sm text-green-600 font-medium">Assignments Due</p>
-                <p className="text-2xl font-bold text-green-900">0</p>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <p className="text-xs text-green-600 font-bold uppercase tracking-wider mb-1">Assignments</p>
+                <p className="text-3xl font-black text-green-900">0</p>
               </div>
-               <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                <p className="text-sm text-purple-600 font-medium">Completed Quizzes</p>
-                <p className="text-2xl font-bold text-purple-900">{studentProfile?.passedQuizzesCount || 0}</p>
+               <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                <p className="text-xs text-purple-600 font-bold uppercase tracking-wider mb-1">Quizzes Passed</p>
+                <p className="text-3xl font-black text-purple-900">{studentProfile?.passedQuizzesCount || 0}</p>
               </div>
             </div>
           </div>
 
           {/* Courses List */}
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-100 col-span-1 md:col-span-3">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Available Courses</h2>
+          <div>
+            <h2 className="text-xl font-bold mb-4 text-gray-800">My Courses</h2>
             {isLoadingCourses ? (
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : courses.length === 0 ? (
-              <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
-                <VideoIcon className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900">No courses available yet</h3>
-                <p className="text-gray-500 mt-1">Check back later when teachers publish new content.</p>
+              <div className="text-center py-12 bg-white rounded-2xl border-2 border-gray-100 border-dashed">
+                <VideoIcon className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-gray-900">No courses available</h3>
+                <p className="text-gray-500 mt-1 max-w-xs mx-auto">Check back soon! Your teachers are preparing new content for you.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {courses.map((course) => (
-                  <div key={course._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/course/${course._id}`)}>
-                    <div className="h-40 bg-gray-100 relative group overflow-hidden">
+                  <div 
+                    key={course._id} 
+                    className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group flex flex-col"
+                    onClick={() => navigate(`/course/${course._id}`)}
+                  >
+                    <div className="h-44 bg-gray-100 relative overflow-hidden shrink-0">
                       {course.thumbnailUrl ? (
                          <img 
                           src={course.thumbnailUrl} 
                           alt={course.title} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <PlayCircle className="w-12 h-12 text-gray-300" />
+                          <PlayCircle className="w-14 h-14 text-gray-200" />
                         </div>
                       )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span className="text-white text-xs font-bold uppercase tracking-widest">Start Learning →</span>
+                      </div>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 text-lg truncate">{course.title}</h3>
-                      <p className="text-gray-500 text-sm line-clamp-2 mt-1">
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="font-bold text-gray-900 text-lg line-clamp-1 mb-2">{course.title}</h3>
+                      <p className="text-gray-500 text-sm line-clamp-2 leading-relaxed flex-1">
                         {course.description || "No description provided."}
                       </p>
+                      <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+                         <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Course</span>
+                         <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -329,8 +332,6 @@ const StudentDashboard = () => {
         </div>
       </main>
     </div>
-    {/* Focus monitor runs on dashboard too (no active video) */}
-    {user?.id && <FocusMonitor studentId={user.id} />}
   </>
   );
 };
