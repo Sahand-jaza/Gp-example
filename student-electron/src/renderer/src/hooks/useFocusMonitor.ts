@@ -56,7 +56,7 @@ export default function useFocusMonitor({ studentId, activeVideoId, getToken, on
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const isMountedRef = useRef(true); // Guard against reconnect after unmount
+  // const isMountedRef = useRef(true); // Guard against reconnect after unmount
 
   const [state, setState] = useState<FocusState>({
     isConnected: false,

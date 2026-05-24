@@ -17,6 +17,9 @@ export default function EditCourseForm({ course, onClose, onSuccess }: EditCours
   const [title, setTitle] = useState(course.title);
   const [description, setDescription] = useState(course.description || "");
   const [thumbnail, setThumbnail] = useState(course.thumbnail || "");
+  const [grade, setGrade] = useState(course.grade || "Grade 10");
+  const [subject, setSubject] = useState(course.subject || "Mathematics");
+  const [duration, setDuration] = useState(course.duration || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -34,6 +37,9 @@ export default function EditCourseForm({ course, onClose, onSuccess }: EditCours
         title,
         description,
         thumbnail,
+        grade,
+        subject,
+        duration: duration.trim() || undefined,
       });
       onSuccess();
     } catch (err: unknown) {
@@ -57,7 +63,7 @@ export default function EditCourseForm({ course, onClose, onSuccess }: EditCours
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
           {error && (
             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
               {error}
@@ -88,6 +94,55 @@ export default function EditCourseForm({ course, onClose, onSuccess }: EditCours
               disabled={isSubmitting}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Grade
+              </label>
+              <select
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-gray-900 bg-white"
+                disabled={isSubmitting}
+              >
+                <option value="Grade 10">Grade 10</option>
+                <option value="Grade 11">Grade 11</option>
+                <option value="Grade 12">Grade 12</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Subject
+              </label>
+              <select
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-gray-900 bg-white"
+                disabled={isSubmitting}
+              >
+                <option value="Mathematics">Mathematics</option>
+                <option value="Science">Science</option>
+                <option value="Coding">Coding</option>
+                <option value="History">History</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Duration
+            </label>
+            <input
+              type="text"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="e.g. 45:17"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-gray-900"
+              disabled={isSubmitting}
+            />
+          </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -97,7 +152,7 @@ export default function EditCourseForm({ course, onClose, onSuccess }: EditCours
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of the course..."
-              rows={4}
+              rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-gray-900 resize-none"
               disabled={isSubmitting}
             />

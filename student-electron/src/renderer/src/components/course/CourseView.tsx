@@ -2,17 +2,15 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { ArrowLeft, PlayCircle, Lock, Sparkles, X, MessageSquare, Send, Play, Pause, Volume2, VolumeX, Maximize, Minimize, CheckCircle2 } from 'lucide-react';
-import { useUser, useAuth } from '@clerk/clerk-react';
+import { useUser } from '@clerk/clerk-react';
 import { useRef } from 'react';
+import Navbar from '../Navbar';
 
 export default function CourseView() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const api = useApi();
   const { user } = useUser();
-  const { getToken } = useAuth(); // Fix #9: for WS auth
-
-  const [clerkToken, setClerkToken] = useState<string | undefined>(undefined);
 
   const [course, setCourse] = useState<any>(null);
   const [activeVideo, setActiveVideo] = useState<any>(null);
@@ -42,11 +40,6 @@ export default function CourseView() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const maxTimeReached = useRef(0);
   const hasMarkedComplete = useRef(false); // Prevent duplicate /complete calls
-
-  // Fix #9: Fetch Clerk token for WebSocket authentication
-  useEffect(() => {
-    getToken().then(t => setClerkToken(t ?? undefined));
-  }, [getToken]);
 
   // Sync fullscreen state
   useEffect(() => {
@@ -163,21 +156,23 @@ export default function CourseView() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{course.title}</h1>
-            <p className="text-sm text-gray-500 line-clamp-1">{course.description}</p>
-          </div>
+      {/* Premium Navbar */}
+      <Navbar />
+
+      {/* Course Context Bar */}
+      <div className="bg-gray-50 border-b border-gray-150 px-6 py-3 flex items-center gap-4 select-none">
+        <button 
+          onClick={() => navigate('/')}
+          className="p-1.5 hover:bg-gray-200 rounded-full transition-all duration-200 text-gray-600 flex items-center justify-center active:scale-90"
+          title="Back to Dashboard"
+        >
+          <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+        </button>
+        <div className="min-w-0">
+          <span className="text-[9px] font-bold text-[#5B86F5] uppercase tracking-widest block leading-none">Course</span>
+          <h1 className="text-sm font-black text-gray-800 truncate mt-1 leading-none">{course.title}</h1>
         </div>
-      </header>
+      </div>
 
       {/* Main Content split */}
       <div className="flex-1 flex overflow-hidden">

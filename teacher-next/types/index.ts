@@ -6,6 +6,10 @@ export interface Course {
   thumbnail?: string;
   thumbnailUrl?: string;
   isPublished: boolean;
+  grade?: string;
+  subject?: string;
+  duration?: string;
+  rating?: number;
   createdAt: string;
   updatedAt: string;
 }

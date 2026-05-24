@@ -110,7 +110,7 @@ export const getCourse = async (req: Request, res: Response) => {
 // Create Course
 export const createCourse = async (req: Request, res: Response) => {
   try {
-    const { title, description, thumbnail } = req.body;
+    const { title, description, thumbnail, grade, subject, duration, rating } = req.body;
     const teacherId = (req as any).auth.userId;
 
     const course = await Course.create({
@@ -118,6 +118,10 @@ export const createCourse = async (req: Request, res: Response) => {
       title,
       description,
       thumbnail,
+      grade,
+      subject,
+      duration,
+      rating,
     });
 
     res.status(201).json({ success: true, course });
@@ -130,7 +134,7 @@ export const createCourse = async (req: Request, res: Response) => {
 export const updateCourse = async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
-    const { title, description, thumbnail, isPublished } = req.body;
+    const { title, description, thumbnail, isPublished, grade, subject, duration, rating } = req.body;
     const teacherId = (req as any).auth.userId;
 
     // Only update fields that are explicitly provided
@@ -139,6 +143,10 @@ export const updateCourse = async (req: Request, res: Response) => {
     if (description !== undefined) updateData.description = description;
     if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
     if (isPublished !== undefined) updateData.isPublished = isPublished;
+    if (grade !== undefined) updateData.grade = grade;
+    if (subject !== undefined) updateData.subject = subject;
+    if (duration !== undefined) updateData.duration = duration;
+    if (rating !== undefined) updateData.rating = rating;
 
     const course = await Course.findOneAndUpdate(
       { _id: courseId, teacherId },

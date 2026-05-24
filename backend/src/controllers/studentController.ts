@@ -115,7 +115,17 @@ export const getStudentCourses = async (req: Request, res: Response) => {
             console.error("Failed to generate thumbnail url for", course._id);
           }
         }
-        return { ...course.toObject(), thumbnailUrl };
+
+        // Find teacher name from User collection
+        let teacherName = "Unknown Teacher";
+        if (course.teacherId) {
+          const teacherUser = await User.findOne({ clerkId: course.teacherId });
+          if (teacherUser) {
+            teacherName = teacherUser.name || "Teacher";
+          }
+        }
+
+        return { ...course.toObject(), thumbnailUrl, teacherName };
       })
     );
 
@@ -210,7 +220,16 @@ export const getStudentCourse = async (req: Request, res: Response) => {
       })
     );
 
-    res.json({ ...course.toObject(), thumbnailUrl, videos: videosWithUrls });
+    // Find teacher name from User collection
+    let teacherName = "Unknown Teacher";
+    if (course.teacherId) {
+      const teacherUser = await User.findOne({ clerkId: course.teacherId });
+      if (teacherUser) {
+        teacherName = teacherUser.name || "Teacher";
+      }
+    }
+
+    res.json({ ...course.toObject(), thumbnailUrl, teacherName, videos: videosWithUrls });
   } catch (error) {
     console.error("Get Student Course Error:", error);
     res.status(500).json({ message: "Server error" });

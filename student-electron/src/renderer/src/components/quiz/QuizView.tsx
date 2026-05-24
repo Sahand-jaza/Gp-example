@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import Navbar from '../Navbar';
 
 export default function QuizView() {
   const { courseId, videoId } = useParams<{ courseId: string, videoId: string }>();
@@ -86,18 +87,23 @@ export default function QuizView() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate(`/course/${courseId}`)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">{quiz.title}</h1>
+      {/* Premium Navbar */}
+      <Navbar />
+
+      {/* Quiz Context Bar */}
+      <div className="bg-gray-50 border-b border-gray-150 px-6 py-3 flex items-center gap-4 select-none">
+        <button 
+          onClick={() => navigate(`/course/${courseId}`)}
+          className="p-1.5 hover:bg-gray-200 rounded-full transition-all duration-200 text-gray-600 flex items-center justify-center active:scale-90"
+          title="Back to Course"
+        >
+          <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+        </button>
+        <div className="min-w-0">
+          <span className="text-[9px] font-bold text-[#5B86F5] uppercase tracking-widest block leading-none">Quiz</span>
+          <h1 className="text-sm font-black text-gray-800 truncate mt-1 leading-none">{quiz.title}</h1>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-6 flex justify-center">
