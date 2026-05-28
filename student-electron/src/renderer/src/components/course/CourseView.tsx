@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../../lib/api';
-import { ArrowLeft, PlayCircle, Lock, Sparkles, X, MessageSquare, Send, Play, Pause, Volume2, VolumeX, Maximize, Minimize, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, PlayCircle, Lock, Sparkles, X, MessageSquare, Send, Play, Pause, Volume2, VolumeX, Maximize, Minimize, CheckCircle2, Star } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useRef } from 'react';
 import Navbar from '../Navbar';
@@ -20,6 +20,12 @@ export default function CourseView() {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // Feedback Modal State
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   // Summarize Modal State
   const [isSummarizeModalOpen, setIsSummarizeModalOpen] = useState(false);
@@ -112,6 +118,28 @@ export default function CourseView() {
     }
   };
 
+  const handleSubmitCourseFeedback = async () => {
+    if (feedbackRating === 0) {
+      alert("Please select a rating.");
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    try {
+      await api.post('/feedback', {
+        courseId: course._id,
+        rating: feedbackRating,
+        comment: feedbackComment
+      });
+      alert("Thank you for your feedback!");
+      setIsFeedbackModalOpen(false);
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+      alert("Failed to submit feedback.");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
@@ -160,18 +188,26 @@ export default function CourseView() {
       <Navbar />
 
       {/* Course Context Bar */}
-      <div className="bg-gray-50 border-b border-gray-150 px-6 py-3 flex items-center gap-4 select-none">
-        <button 
-          onClick={() => navigate('/')}
-          className="p-1.5 hover:bg-gray-200 rounded-full transition-all duration-200 text-gray-600 flex items-center justify-center active:scale-90"
-          title="Back to Dashboard"
-        >
-          <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-        </button>
-        <div className="min-w-0">
-          <span className="text-[9px] font-bold text-[#5B86F5] uppercase tracking-widest block leading-none">Course</span>
-          <h1 className="text-sm font-black text-gray-800 truncate mt-1 leading-none">{course.title}</h1>
+      <div className="bg-gray-50 border-b border-gray-150 px-6 py-3 flex items-center justify-between select-none">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/')}
+            className="p-1.5 hover:bg-gray-200 rounded-full transition-all duration-200 text-gray-600 flex items-center justify-center active:scale-90"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+          </button>
+          <div className="min-w-0">
+            <span className="text-[9px] font-bold text-[#5B86F5] uppercase tracking-widest block leading-none">Course</span>
+            <h1 className="text-sm font-black text-gray-800 truncate mt-1 leading-none">{course.title}</h1>
+          </div>
         </div>
+        <button
+          onClick={() => setIsFeedbackModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200 rounded-xl text-xs font-bold transition-colors active:scale-95 shadow-sm"
+        >
+          <Star className="w-4 h-4 fill-yellow-500 stroke-yellow-500" /> Rate Course
+        </button>
       </div>
 
       {/* Main Content split */}
@@ -641,6 +677,75 @@ export default function CourseView() {
                >
                  Close
                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Feedback Modal */}
+      {isFeedbackModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-yellow-50 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <Star className="w-5 h-5 text-yellow-600 fill-yellow-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Rate this Course</h3>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{course?.title}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsFeedbackModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full p-2 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col items-center">
+              <div className="flex gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setFeedbackRating(star)}
+                    className="p-1 hover:scale-110 transition-transform active:scale-95"
+                  >
+                    <Star 
+                      className={`w-8 h-8 ${feedbackRating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`} 
+                    />
+                  </button>
+                ))}
+              </div>
+              
+              <textarea
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                placeholder="Share your thoughts about this course (optional)..."
+                className="w-full h-32 p-4 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:bg-white transition-all resize-none"
+              />
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+              <button 
+                onClick={() => setIsFeedbackModalOpen(false)}
+                className="px-5 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSubmitCourseFeedback}
+                disabled={isSubmittingFeedback || feedbackRating === 0}
+                className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
+              >
+                {isSubmittingFeedback ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Submit Feedback
+              </button>
             </div>
           </div>
         </div>

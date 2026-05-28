@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSignIn } from '@clerk/clerk-expo';
+import { useSignIn, useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }: any) {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { signOut } = useAuth();
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,12 @@ export default function LoginScreen({ navigation }: any) {
         Alert.alert("Authentication Failure", "Please check your credentials and try again.");
       }
     } catch (err: any) {
-      Alert.alert("Sign In Error", err.errors?.[0]?.message || "An unexpected error occurred.");
+      if (err.errors?.[0]?.code === 'session_exists' || err.errors?.[0]?.message === 'Session already exists') {
+        await signOut();
+        Alert.alert("Session Refreshed", "An old session was detected and cleared. Please try signing in again.");
+      } else {
+        Alert.alert("Sign In Error", err.errors?.[0]?.message || "An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -80,6 +86,9 @@ export default function LoginScreen({ navigation }: any) {
                 <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} className="mt-3 self-end mr-1">
+              <Text className="text-brand-accent font-medium">Forgot Password?</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

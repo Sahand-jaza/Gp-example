@@ -56,8 +56,12 @@ export default async function CourseDetailPage(props: { params: Promise<{ id: st
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="rounded-full bg-green-100 px-4 py-1 text-xs font-black uppercase tracking-widest text-green-700 ring-1 ring-green-600/20">
-            Active
+          <div className={`rounded-full px-4 py-1 text-xs font-black uppercase tracking-widest ring-1 ${
+            course.isPublished 
+              ? "bg-green-100 text-green-700 ring-1 ring-green-600/20" 
+              : "bg-amber-100 text-amber-700 ring-1 ring-amber-600/20"
+          }`}>
+            {course.isPublished ? "Published" : "Draft"}
           </div>
           <div className="rounded-full bg-blue-100 px-4 py-1 text-xs font-black uppercase tracking-widest text-blue-700 ring-1 ring-blue-600/20">
             {course.category || "General"}
@@ -135,10 +139,18 @@ export default async function CourseDetailPage(props: { params: Promise<{ id: st
               <div className="flex flex-col">
                 <dt className="flex items-center text-xs font-bold text-slate-500 uppercase">
                   <UserIcon className="mr-2 h-3.5 w-3.5" />
-                  Instructor ID
+                  Instructor
                 </dt>
-                <dd className="mt-1 font-mono text-xs font-bold text-slate-900 truncate bg-slate-50 p-2 rounded border border-slate-200">
-                  {course.teacherId}
+                <dd className="mt-1 text-sm font-bold text-slate-900">
+                  {course.teacherName || "Unknown Teacher"}
+                </dd>
+              </div>
+              <div className="flex flex-col">
+                <dt className="flex items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Email Address
+                </dt>
+                <dd className="mt-1 font-mono text-xs font-semibold text-slate-600 truncate bg-slate-50 p-2 rounded border border-slate-200" title={course.teacherEmail}>
+                  {course.teacherEmail || "N/A"}
                 </dd>
               </div>
               <div className="flex flex-col">

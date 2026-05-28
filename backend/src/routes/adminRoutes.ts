@@ -10,7 +10,8 @@ import {
   createUser,
   createAdminCourse,
   updateUserStatus,
-  updateUser
+  updateUser,
+  updateAdminCourse
 } from "../controllers/adminController";
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.get("/courses", requireAuth(), requireOrgRole("admin"), getAllCourses);
 
 router.post("/users", requireAuth(), requireOrgRole("admin"), createUser);
 router.post("/courses", requireAuth(), requireOrgRole("admin"), createAdminCourse);
+router.patch("/courses/:courseId", requireAuth(), requireOrgRole("admin"), updateAdminCourse);
 router.patch("/users/:userId/status", requireAuth(), requireOrgRole("admin"), updateUserStatus);
 router.put("/users/:userId", requireAuth(), requireOrgRole("admin"), updateUser);
 router.delete("/users/:userId", requireAuth(), requireOrgRole("admin"), deleteUser);

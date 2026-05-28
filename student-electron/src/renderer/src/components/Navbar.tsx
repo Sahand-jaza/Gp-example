@@ -15,7 +15,6 @@ interface NavbarProps {
   unreadCount?: number;
   markNotificationRead?: (id: string) => void;
   // Student Profile for organization / link code
-  studentProfile?: any;
   organizationName?: string;
 }
 
@@ -29,7 +28,6 @@ export default function Navbar({
   setShowNotifications,
   unreadCount = 0,
   markNotificationRead,
-  studentProfile,
   organizationName
 }: NavbarProps) {
   const { user } = useUser();

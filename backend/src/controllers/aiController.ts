@@ -98,8 +98,12 @@ export const generateLiveSummary = async (req: Request, res: Response) => {
 
     const text = response.text ?? "";
     res.json({ summary: text });
-  } catch (error) {
+  } catch (error: any) {
     console.error("AI Error:", error);
+    if (error?.status === 503) {
+      res.status(503).json({ message: "The AI service is currently experiencing high demand. Please try again in a few moments." });
+      return;
+    }
     res.status(500).json({ message: "AI generation failed" });
   }
 };
@@ -161,6 +165,10 @@ export const summarizeVideo = async (req: Request, res: Response) => {
     res.json({ summary: summaryText });
   } catch (error: any) {
     console.error("Generate Video Summary Error:", error);
+    if (error?.status === 503) {
+      res.status(503).json({ message: "The AI service is currently experiencing high demand. Please try again in a few moments." });
+      return;
+    }
     res.status(500).json({ message: "Failed to summarize video", error: error.message });
   }
 };

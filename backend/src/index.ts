@@ -27,7 +27,7 @@ app.use(express.json());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGIN
     ? process.env.ALLOWED_ORIGIN.split(',')
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
   credentials: true,
 }));
 app.use(helmet());
@@ -63,6 +63,7 @@ import notificationRoutes from "./routes/notificationRoutes";
 import studentRoutes from "./routes/studentRoutes";
 import parentRoutes from "./routes/parentRoutes";
 import adminRoutes from "./routes/adminRoutes";
+import feedbackRoutes from "./routes/feedbackRoutes";
 import { startCronJobs } from "./utils/cron";
 app.use("/api/connect", connectionRoutes);
 app.use("/api/student", studentRoutes);
@@ -74,6 +75,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/parents", parentRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 // Start Cron
 startCronJobs();

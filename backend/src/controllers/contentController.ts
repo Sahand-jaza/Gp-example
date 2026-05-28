@@ -8,6 +8,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/r2Storage";
 import Course from "../models/Course";
 import Video from "../models/Video";
+import User from "../models/User";
 import { getSignedViewUrl } from "../utils/s3";
 
 
@@ -76,7 +77,7 @@ export const getCourse = async (req: Request, res: Response) => {
     const userRole = (req as any).userRole; // Set by middleware
     const isAdmin = userRole === "admin" || userRole === "org:admin";
 
-    const course = await Course.findOne({ _id: courseId });
+    const course = await Course.findOne({ _id: courseId }).lean() as any;
 
     if (!course) {
       res.status(404).json({ message: "Course not found" });
@@ -89,18 +90,32 @@ export const getCourse = async (req: Request, res: Response) => {
       return;
     }
     
-    const matchedCourse = course;
-    
-    let thumbnailUrl = null;
-    if (matchedCourse.thumbnail) {
-      try {
-        thumbnailUrl = await getSignedViewUrl(matchedCourse.thumbnail);
-      } catch (err) {
-        console.error("Failed to generate thumbnail url for", matchedCourse._id);
+    // Fetch teacher/instructor details
+    let teacherName = "Unknown Teacher";
+    let teacherEmail = "N/A";
+    if (course.teacherId) {
+      const dbTeacher = await User.findOne({ clerkId: course.teacherId }).select("name email").lean() as any;
+      if (dbTeacher) {
+        teacherName = dbTeacher.name || "Unknown Teacher";
+        teacherEmail = dbTeacher.email || "N/A";
       }
     }
     
-    res.json({ ...matchedCourse.toObject(), thumbnailUrl });
+    let thumbnailUrl = null;
+    if (course.thumbnail) {
+      try {
+        thumbnailUrl = await getSignedViewUrl(course.thumbnail);
+      } catch (err) {
+        console.error("Failed to generate thumbnail url for", course._id);
+      }
+    }
+    
+    res.json({ 
+      ...course, 
+      thumbnailUrl, 
+      teacherName, 
+      teacherEmail 
+    });
   } catch (error) {
     console.error(`[getCourse] Error:`, error);
     res.status(500).json({ message: "Server error" });

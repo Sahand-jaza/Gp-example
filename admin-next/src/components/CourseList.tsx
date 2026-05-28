@@ -9,7 +9,8 @@ import {
   Layers,
   GraduationCap,
   X,
-  Trash2
+  Trash2,
+  Star
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
@@ -57,6 +58,44 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
     }
   };
 
+  const handleToggleFeatured = async (courseId: string, currentFeatured: boolean) => {
+    try {
+      const token = await getToken();
+      const res = await api.patch(`/admin/courses/${courseId}`, {
+        isFeatured: !currentFeatured
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        setCourses(courses.map((c: any) => 
+          c._id === courseId ? { ...c, isFeatured: !currentFeatured } : c
+        ));
+      }
+    } catch (error) {
+      console.error("Toggle featured failed:", error);
+      alert("Failed to toggle featured status.");
+    }
+  };
+
+  const handleTogglePublished = async (courseId: string, currentPublished: boolean) => {
+    try {
+      const token = await getToken();
+      const res = await api.patch(`/admin/courses/${courseId}`, {
+        isPublished: !currentPublished
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        setCourses(courses.map((c: any) => 
+          c._id === courseId ? { ...c, isPublished: !currentPublished } : c
+        ));
+      }
+    } catch (error) {
+      console.error("Toggle published failed:", error);
+      alert("Failed to toggle publication status.");
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -90,35 +129,77 @@ export default function CourseList({ initialCourses }: { initialCourses: any[] }
             <div className="flex-1 p-6">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{course.category || "General"}</span>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{course.category || "General"}</span>
+                    {course.isFeatured && (
+                      <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-yellow-700 tracking-wider flex items-center gap-0.5 ring-1 ring-yellow-600/20">
+                        <Star className="h-2.5 w-2.5 fill-yellow-600 text-yellow-600" />
+                        Featured
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-xl font-bold text-slate-900">{course.title}</h3>
                 </div>
-                <button 
-                  onClick={() => handleDeleteCourse(course._id)}
-                  className="text-slate-400 hover:text-red-600 transition-colors"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
+                
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Star Toggle */}
+                  <button 
+                    onClick={() => handleToggleFeatured(course._id, !!course.isFeatured)}
+                    title={course.isFeatured ? "Remove from Featured" : "Mark as Featured"}
+                    className={`rounded-lg p-2 transition-all border ${
+                      course.isFeatured 
+                        ? "bg-yellow-50 border-yellow-200 text-yellow-500 hover:bg-yellow-100" 
+                        : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-yellow-500"
+                    }`}
+                  >
+                    <Star className={`h-4 w-4 ${course.isFeatured ? "fill-yellow-500" : ""}`} />
+                  </button>
+
+                  {/* Delete Button */}
+                  <button 
+                    onClick={() => handleDeleteCourse(course._id)}
+                    title="Delete Course"
+                    className="rounded-lg border border-slate-200 bg-white p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               
-              <div className="flex items-center gap-4 mt-4 mb-6">
-                <div className="flex items-center text-sm text-slate-500">
-                  <GraduationCap className="mr-1.5 h-4 w-4" />
-                  ID: {course.instructorId?.substring(0, 8)}...
+              <div className="flex flex-col gap-1.5 mt-4 mb-5 border-t border-b border-slate-50 py-3">
+                <div className="flex items-center text-xs font-extrabold text-slate-800">
+                  <GraduationCap className="mr-1.5 h-4 w-4 text-blue-600 shrink-0" />
+                  <span>Instructor: {course.teacherName || "Unknown Teacher"}</span>
                 </div>
-                <div className="flex items-center text-sm text-slate-500">
-                  <Layers className="mr-1.5 h-4 w-4" />
-                  {course._id.substring(0, 6).toUpperCase()}
+                {course.teacherEmail && (
+                  <div className="text-[11px] font-medium text-slate-500 pl-5.5 select-all leading-none truncate max-w-[280px]">
+                    {course.teacherEmail}
+                  </div>
+                )}
+                <div className="flex items-center text-xs font-bold text-slate-500 pl-5.5 mt-1">
+                  <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-mono">Course Ref: {course._id.substring(0, 6).toUpperCase()}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-slate-700">Course Status</span>
-                  <span className="font-bold text-green-600">Active</span>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="font-semibold text-slate-500 text-xs uppercase tracking-wider">Course Status</span>
+                  <button
+                    onClick={() => handleTogglePublished(course._id, !!course.isPublished)}
+                    title={course.isPublished ? "Set to Draft (Unpublish)" : "Publish Course"}
+                    className={`px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider transition-all hover:scale-[1.05] active:scale-[0.95] cursor-pointer ${
+                      course.isPublished 
+                        ? "bg-green-50 text-green-700 ring-1 ring-green-600/20 hover:bg-green-100" 
+                        : "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 hover:bg-amber-100"
+                    }`}
+                  >
+                    {course.isPublished ? "Published" : "Draft"}
+                  </button>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: "100%" }}></div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div className={`h-1.5 rounded-full transition-all duration-500 ${
+                    course.isPublished ? "bg-green-500" : "bg-amber-500"
+                  }`} style={{ width: "100%" }}></div>
                 </div>
               </div>
 

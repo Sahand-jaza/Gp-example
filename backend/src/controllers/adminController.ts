@@ -84,8 +84,16 @@ export const getAllCourses = async (req: Request, res: Response) => {
   try {
     const courses = await Course.find().sort({ createdAt: -1 }).lean();
     
-    // Generate signed URLs for thumbnails
-    const coursesWithThumbnails = await Promise.all(
+    // Fetch user details for all unique teacherIds
+    const teacherIds = Array.from(new Set(courses.map((c: any) => c.teacherId)));
+    const teachers = await User.find({ clerkId: { $in: teacherIds } }).select("clerkId name email").lean();
+    const teacherMap = new Map<string, { name: string; email: string }>();
+    teachers.forEach((t: any) => {
+      teacherMap.set(t.clerkId, { name: t.name || "Unknown Teacher", email: t.email || "" });
+    });
+
+    // Generate signed URLs for thumbnails and attach teacher details
+    const coursesWithDetails = await Promise.all(
       courses.map(async (course: any) => {
         let thumbnailUrl = null;
         if (course.thumbnail) {
@@ -95,12 +103,19 @@ export const getAllCourses = async (req: Request, res: Response) => {
             console.error("Failed to generate thumbnail url for", course._id);
           }
         }
-        return { ...course, thumbnailUrl };
+        const teacherInfo = teacherMap.get(course.teacherId) || { name: "Unknown Teacher", email: "N/A" };
+        return { 
+          ...course, 
+          thumbnailUrl,
+          teacherName: teacherInfo.name,
+          teacherEmail: teacherInfo.email
+        };
       })
     );
 
-    res.json({ success: true, courses: coursesWithThumbnails });
+    res.json({ success: true, courses: coursesWithDetails });
   } catch (error) {
+    console.error("Error fetching courses with teacher details:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -218,6 +233,33 @@ export const updateUser = async (req: Request, res: Response) => {
 
     res.json({ success: true, user });
   } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const updateAdminCourse = async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params;
+    const { isPublished, isFeatured } = req.body;
+
+    const updateData: any = {};
+    if (isPublished !== undefined) updateData.isPublished = isPublished;
+    if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
+
+    const course = await Course.findByIdAndUpdate(
+      courseId,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!course) {
+      res.status(404).json({ success: false, message: "Course not found" });
+      return;
+    }
+
+    res.json({ success: true, course });
+  } catch (error) {
+    console.error("Error updating admin course:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

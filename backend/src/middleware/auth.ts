@@ -104,14 +104,29 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
            const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Unknown";
            const { ROLE_PERMISSIONS } = await import("../config/permissions");
            
-           dbUser = await User.create({
-             clerkId: userId,
-             email,
-             name,
-             role: userRole || strippedRole,
-             permissions: ROLE_PERMISSIONS[userRole || strippedRole] || []
-           });
-           console.log(`Auto-created missing MongoDB user ${userId} with role ${userRole || strippedRole}`);
+           // Check if user exists with this email but different clerkId
+           if (email) {
+             dbUser = await User.findOne({ email });
+           }
+
+           if (dbUser) {
+             dbUser.clerkId = userId;
+             if (userRole) {
+               dbUser.role = userRole as "parent" | "student" | "teacher" | "admin";
+               dbUser.permissions = ROLE_PERMISSIONS[userRole] || [];
+             }
+             await dbUser.save();
+             console.log(`Auto-synced existing MongoDB user (email match) to new clerkId ${userId}`);
+           } else {
+             dbUser = await User.create({
+               clerkId: userId,
+               email,
+               name,
+               role: userRole || strippedRole,
+               permissions: ROLE_PERMISSIONS[userRole || strippedRole] || []
+             });
+             console.log(`Auto-created missing MongoDB user ${userId} with role ${userRole || strippedRole}`);
+           }
         } else if (userRole && dbUser.role !== userRole) {
            dbUser.role = userRole as "parent" | "student" | "teacher" | "admin";
            const { ROLE_PERMISSIONS } = await import("../config/permissions");

@@ -239,6 +239,10 @@ const StudentDashboard = () => {
 
   // Split courses for carousels
   const featuredCourses = enrichedCourses.filter(c => {
+    const hasFeaturedFlag = enrichedCourses.some(x => x.isFeatured === true);
+    if (hasFeaturedFlag) {
+      return c.isFeatured === true;
+    }
     const rateNum = parseFloat(c.rating);
     return rateNum >= 4.3;
   });
@@ -366,7 +370,6 @@ const StudentDashboard = () => {
         setShowNotifications={setShowNotifications}
         unreadCount={unreadCount}
         markNotificationRead={markNotificationRead}
-        studentProfile={studentProfile}
         organizationName={organization?.name}
       />
 

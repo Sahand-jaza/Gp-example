@@ -1,5 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import { getAuth, clerkClient } from "@clerk/express";
+import User from "../models/User";
 import { requireAuth, requireOrgRole } from "../middleware/auth";
 import {
   getUploadUrl,
@@ -18,16 +20,57 @@ import {
 const router = express.Router();
 
 // Fix #4: Role guard — allows students, teachers, and admins (prevents parents from accessing video URLs)
-const requireStudentOrTeacher = (req: Request, res: Response, next: NextFunction) => {
-  const role = ((req as any).userRole || "") as string;
-  const normalised = role.replace("org:", "");
-  if (
-    ["student", "teacher", "admin"].includes(normalised) ||
-    ["org:student", "org:teacher", "org:admin"].includes(role)
-  ) {
-    return next();
+const requireStudentOrTeacher = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authData = getAuth(req);
+    const { userId, orgRole } = authData;
+
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let userRole = (req as any).userRole || null;
+
+    if (!userRole) {
+      // Priority check: MongoDB first
+      try {
+        const dbUser = await User.findOne({ clerkId: userId }).lean() as any;
+        if (dbUser && dbUser.role) {
+          userRole = dbUser.role;
+        }
+      } catch (err) {
+        console.error("Error fetching user from MongoDB:", err);
+      }
+    }
+
+    if (!userRole) {
+      // Fallback: Clerk public/unsafe metadata
+      try {
+        const user = await clerkClient.users.getUser(userId);
+        userRole = (user.publicMetadata?.role as string) || (user.unsafeMetadata?.role as string);
+      } catch (err) {
+        console.error("Error fetching user from Clerk API:", err);
+      }
+    }
+
+    // Attach to request
+    (req as any).userRole = userRole;
+
+    const role = (userRole || "") as string;
+    const normalised = role.replace("org:", "");
+    if (
+      ["student", "teacher", "admin"].includes(normalised) ||
+      ["org:student", "org:teacher", "org:admin"].includes(role) ||
+      (orgRole && ["org:admin", "admin"].includes(orgRole))
+    ) {
+      return next();
+    }
+    res.status(403).json({ error: "Forbidden: Students and Teachers only" });
+  } catch (error) {
+    console.error("Error in requireStudentOrTeacher middleware:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-  res.status(403).json({ error: "Forbidden: Students and Teachers only" });
 };
 
 // Protected routes (Teacher only)

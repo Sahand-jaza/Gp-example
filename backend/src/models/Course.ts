@@ -6,6 +6,7 @@ const courseSchema = new mongoose.Schema({
   description: { type: String },
   thumbnail: { type: String },
   isPublished: { type: Boolean, default: false },
+  isFeatured: { type: Boolean, default: false },
   grade: { type: String },
   subject: { type: String },
   duration: { type: String },
