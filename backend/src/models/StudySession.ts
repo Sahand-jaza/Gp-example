@@ -6,6 +6,7 @@ const focusLogSchema = new mongoose.Schema(
     focusLevel: { type: Number },
     currentActivity: { type: String },
     videoId: { type: mongoose.Schema.Types.ObjectId, ref: "Video" },
+    mood: { type: String },
   },
   { _id: false },
 );
@@ -16,6 +17,7 @@ const studySessionSchema = new mongoose.Schema({
   endTime: { type: Date },
   lastActive: { type: Date, default: Date.now },
   averageFocus: { type: Number },
+  dominantMood: { type: String },
   sessionTopic: { type: String },
   status: {
     type: String,
