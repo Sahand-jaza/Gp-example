@@ -11,13 +11,19 @@ import {
   createAdminCourse,
   updateUserStatus,
   updateUser,
-  updateAdminCourse
+  updateAdminCourse,
+  getPlatformSettings,
+  updatePlatformSettings
 } from "../controllers/adminController";
 
 const router = express.Router();
 
 // Stats
 router.get("/stats", requireAuth(), requireOrgRole("admin"), getDashboardStats);
+
+// Settings
+router.get("/settings", requireAuth(), requireOrgRole("admin"), getPlatformSettings);
+router.put("/settings", requireAuth(), requireOrgRole("admin"), updatePlatformSettings);
 
 // Management
 router.get("/users", requireAuth(), requireOrgRole("admin"), getAllUsers);

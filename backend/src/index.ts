@@ -27,7 +27,12 @@ app.use(express.json());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGIN
     ? process.env.ALLOWED_ORIGIN.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8081', 'app://.' /* Electron */],
+    : [
+        'http://localhost:3000', 'http://localhost:3001', 
+        'http://127.0.0.1:3000', 'http://127.0.0.1:3001',
+        'http://localhost:5173', 'http://localhost:5174', 
+        'http://localhost:8081', 'app://.'
+      ],
   credentials: true,
 }));
 app.use(helmet());

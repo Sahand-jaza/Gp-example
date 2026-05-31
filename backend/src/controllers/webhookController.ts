@@ -61,7 +61,10 @@ export const handleClerkWebhook = async (req: Request, res: Response) => {
     const name = `${evt.data.first_name} ${evt.data.last_name}`.trim();
     const unsafeRole = evt.data.unsafe_metadata?.role;
     const publicRole = evt.data.public_metadata?.role;
-    const role = unsafeRole || publicRole || "student"; // Default to student if not set
+    
+    // Only trust unsafeRole if it's "student" or "parent"
+    const safeUnsafeRole = (unsafeRole === "student" || unsafeRole === "parent") ? unsafeRole : null;
+    const role = publicRole || safeUnsafeRole || "student"; // Default to student if not set
     const permissions = ROLE_PERMISSIONS[role] || [];
 
     try {
@@ -72,13 +75,13 @@ export const handleClerkWebhook = async (req: Request, res: Response) => {
       );
       console.log(`User synced: ${id} (${role})`);
 
-      // If this is a new signup with a role provided by the frontend, lock it into publicMetadata
-      if (eventType === "user.created" && unsafeRole) {
+      // If this is a new signup with a safe role provided by the frontend, lock it into publicMetadata
+      if (eventType === "user.created" && safeUnsafeRole) {
         try {
           await clerkClient.users.updateUserMetadata(id, {
-            publicMetadata: { role: unsafeRole }
+            publicMetadata: { role: safeUnsafeRole }
           });
-          console.log(`Clerk publicMetadata updated with role '${unsafeRole}' for user ${id}`);
+          console.log(`Clerk publicMetadata updated with role '${safeUnsafeRole}' for user ${id}`);
         } catch (clerkErr) {
           console.error("Error updating Clerk metadata:", clerkErr);
         }

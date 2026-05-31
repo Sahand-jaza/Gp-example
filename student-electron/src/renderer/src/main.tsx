@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
-import { HashRouter, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import App from './App'
 import './assets/index.css'
 
@@ -10,6 +10,8 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 if (!PUBLISHABLE_KEY) {
   throw new Error("Missing Publishable Key")
 }
+
+import { BrowserRouter } from 'react-router-dom'
 
 const ClerkWithRoutes = () => {
   const navigate = useNavigate();
@@ -28,8 +30,8 @@ const ClerkWithRoutes = () => {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <HashRouter>
+    <BrowserRouter>
       <ClerkWithRoutes />
-    </HashRouter>
+    </BrowserRouter>
   </React.StrictMode>
 )

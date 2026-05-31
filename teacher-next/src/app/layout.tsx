@@ -27,7 +27,7 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         elements: {
-          footerAction: "hidden",
+          footerAction: { display: "none" },
         },
       }}
     >

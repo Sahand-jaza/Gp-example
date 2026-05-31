@@ -24,7 +24,7 @@ export default function ForbiddenError() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
         <p className="text-gray-600 mb-6">
-          You are not allowed to access the teacher platform because your account is registered as a <strong>student</strong>.
+          You are not allowed to access this section of the teacher platform. Your account may not have the required permissions.
         </p>
         <div className="flex justify-center border-t border-red-200 pt-6">
           <UserButton afterSignOutUrl="/" showName />

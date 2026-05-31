@@ -19,6 +19,13 @@ const StudentDashboard = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   
+  // Dashboard Settings
+  const [dashboardSettings, setDashboardSettings] = useState<any>({
+    featuredTitle: 'Featured & reccomended',
+    newlyUploadedTitle: 'Newly uploaded',
+    teacherTitle: 'New from {Teacher}'
+  });
+
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -87,7 +94,19 @@ const StudentDashboard = () => {
       }
     };
 
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get('/student/dashboard-settings');
+        if (response.data.success && response.data.settings) {
+          setDashboardSettings(response.data.settings);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard settings:', error);
+      }
+    };
+
     fetchCourses();
+    fetchSettings();
   }, [api]);
 
   const fetchNotifications = async () => {
@@ -544,7 +563,7 @@ const StudentDashboard = () => {
             <div className="space-y-10">
               {/* Row 1: Featured & Recommended */}
               <div className="space-y-4">
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Featured & reccomended</h2>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">{dashboardSettings.featuredTitle}</h2>
                 <div 
                   className="flex overflow-x-auto gap-6 pb-4 scroll-smooth snap-x snap-mandatory no-scrollbar"
                   style={scrollStyle}
@@ -557,7 +576,7 @@ const StudentDashboard = () => {
 
               {/* Row 2: Newly uploaded */}
               <div className="space-y-4">
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Newly uploaded</h2>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">{dashboardSettings.newlyUploadedTitle}</h2>
                 <div 
                   className="flex overflow-x-auto gap-6 pb-4 scroll-smooth snap-x snap-mandatory no-scrollbar"
                   style={scrollStyle}
@@ -570,7 +589,9 @@ const StudentDashboard = () => {
 
               {/* Row 3: New from dynamic teacher */}
               <div className="space-y-4">
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">New from {dominantTeacher}</h2>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                  {dashboardSettings.teacherTitle.replace('{Teacher}', dominantTeacher)}
+                </h2>
                 <div 
                   className="flex overflow-x-auto gap-6 pb-4 scroll-smooth snap-x snap-mandatory no-scrollbar"
                   style={scrollStyle}

@@ -64,7 +64,22 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
     // Priority Fix: Always check MongoDB first for the most up-to-date role
     let userRole: string | null = null;
     try {
-      const dbUser = await User.findOne({ clerkId: userId }).lean() as any;
+      let dbUser = await User.findOne({ clerkId: userId }).lean() as any;
+      
+      // If not found by clerkId, try falling back to email (e.g. they used Google OAuth)
+      if (!dbUser) {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+        if (email) {
+          dbUser = await User.findOne({ email }).lean() as any;
+          if (dbUser) {
+             // We found them by email! Update their clerkId in MongoDB so future lookups are fast
+             await User.updateOne({ _id: dbUser._id }, { $set: { clerkId: userId } });
+             console.log(`[DEBUG] Auto-linked existing user by email to new clerkId ${userId}`);
+          }
+        }
+      }
+
       if (dbUser && dbUser.role) {
         userRole = dbUser.role;
         console.log(`[DEBUG] Role prioritized from MongoDB for user ${userId}: ${userRole}`);
@@ -74,14 +89,14 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
     }
 
     // Fallback to session claims if not in DB
-      if (!userRole) {
-        try {
-          const user = await clerkClient.users.getUser(userId);
-          userRole = (user.publicMetadata?.role as string) || (user.unsafeMetadata?.role as string);
-        } catch (err) {
-          console.error("Error fetching user from Clerk API:", err);
-        }
+    if (!userRole) {
+      try {
+        const user = await clerkClient.users.getUser(userId);
+        userRole = (user.publicMetadata?.role as string);
+      } catch (err) {
+        console.error("Error fetching user from Clerk API:", err);
       }
+    }
 
     // Attach to request for use in controllers
     (req as any).userRole = userRole;

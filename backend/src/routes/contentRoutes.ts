@@ -48,7 +48,7 @@ const requireStudentOrTeacher = async (req: Request, res: Response, next: NextFu
       // Fallback: Clerk public/unsafe metadata
       try {
         const user = await clerkClient.users.getUser(userId);
-        userRole = (user.publicMetadata?.role as string) || (user.unsafeMetadata?.role as string);
+        userRole = (user.publicMetadata?.role as string);
       } catch (err) {
         console.error("Error fetching user from Clerk API:", err);
       }

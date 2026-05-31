@@ -4,8 +4,19 @@ import User from "../models/User";
 import Course from "../models/Course";
 import StudentProfile from "../models/StudentProfile";
 import ParentProfile from "../models/ParentProfile";
+import QuizResult from "../models/QuizResult";
+import QuizScore from "../models/QuizScore";
+import StudySession from "../models/StudySession";
+import Feedback from "../models/Feedback";
+import AiSummary from "../models/AiSummary";
+import Quiz from "../models/Quiz";
+import Video from "../models/Video";
+import Comment from "../models/Comment";
+import Notification from "../models/Notification";
 import { getSignedViewUrl } from "../utils/s3";
 import { ROLE_PERMISSIONS } from "../config/permissions";
+import PlatformSettings from "../models/PlatformSettings";
+
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const sevenDaysAgo = new Date();
@@ -124,17 +135,48 @@ export const deleteUser = async (req: Request, res: Response) => {
   try {
     const userId = req.params.userId as string;
 
-    // 1. Delete from Clerk first
+    // 1. Find user to know their role for cascading deletion
+    const user = await User.findOne({ clerkId: userId });
+    
+    if (user) {
+      // 2. Perform role-based cascading deletion
+      if (user.role === "student") {
+        await StudentProfile.findOneAndDelete({ studentId: userId });
+        await QuizResult.deleteMany({ studentId: userId });
+        await QuizScore.deleteMany({ studentId: userId });
+        await StudySession.deleteMany({ studentId: userId });
+        await Feedback.deleteMany({ studentId: userId });
+        await AiSummary.deleteMany({ studentId: userId });
+      } else if (user.role === "teacher") {
+        const courses = await Course.find({ teacherId: userId });
+        const courseIds = courses.map((c) => c._id);
+        
+        await Video.deleteMany({ courseId: { $in: courseIds } });
+        await Quiz.deleteMany({ teacherId: userId });
+        await Course.deleteMany({ teacherId: userId });
+      } else if (user.role === "parent") {
+        await ParentProfile.findOneAndDelete({ parentId: userId });
+        await AiSummary.deleteMany({ parentId: userId });
+      }
+
+      // 3. Universal cleanup (Comments, Notifications)
+      await Comment.deleteMany({ userId: userId });
+      await Comment.updateMany({}, { $pull: { replies: { userId: userId } } as any });
+      await Notification.deleteMany({ userId: userId });
+    }
+
+    // 4. Delete from Clerk first
     try {
       await clerkClient.users.deleteUser(userId);
     } catch (e) {
       console.warn("Clerk user deletion failed or user not found in Clerk:", e);
     }
 
-    // 2. Delete from MongoDB
+    // 5. Delete from MongoDB
     await User.findOneAndDelete({ clerkId: userId });
-    res.json({ success: true, message: "User deleted" });
+    res.json({ success: true, message: "User deleted successfully with all associated data" });
   } catch (error) {
+    console.error("Error in deleteUser:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -260,6 +302,36 @@ export const updateAdminCourse = async (req: Request, res: Response) => {
     res.json({ success: true, course });
   } catch (error) {
     console.error("Error updating admin course:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const getPlatformSettings = async (req: Request, res: Response) => {
+  try {
+    let settings = await PlatformSettings.findOne();
+    if (!settings) {
+      settings = await PlatformSettings.create({});
+    }
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const updatePlatformSettings = async (req: Request, res: Response) => {
+  try {
+    const { featuredTitle, newlyUploadedTitle, teacherTitle } = req.body;
+    let settings = await PlatformSettings.findOne();
+    if (!settings) {
+      settings = await PlatformSettings.create({ featuredTitle, newlyUploadedTitle, teacherTitle });
+    } else {
+      if (featuredTitle !== undefined) settings.featuredTitle = featuredTitle;
+      if (newlyUploadedTitle !== undefined) settings.newlyUploadedTitle = newlyUploadedTitle;
+      if (teacherTitle !== undefined) settings.teacherTitle = teacherTitle;
+      await settings.save();
+    }
+    res.json({ success: true, settings });
+  } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

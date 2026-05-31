@@ -13,6 +13,7 @@ interface VideoUploadFormProps {
 export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoUploadFormProps) {
   const api = useApi();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
   
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -41,6 +42,7 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
   const uploadToR2 = (url: string, file: File) => {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -58,12 +60,26 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
       };
 
       xhr.onerror = () => reject(new Error("Network error during upload."));
+      xhr.onabort = () => reject(new Error("Upload cancelled."));
 
       xhr.open("PUT", url, true);
       xhr.setRequestHeader("Content-Type", file.type);
       // No extra headers needed for R2 standard PUT upload
       xhr.send(file);
     });
+  };
+
+  const handleCancel = () => {
+    if (isSubmitting) {
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+      }
+      setIsSubmitting(false);
+      setUploadProgress(0);
+      setStatusText("");
+    } else {
+      onClose();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,9 +131,8 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
         <div className="flex justify-between items-center p-5 border-b border-gray-100 shrink-0">
           <h2 className="text-xl font-semibold text-gray-900">Upload Video Lesson</h2>
           <button 
-            onClick={onClose} 
-            disabled={isSubmitting}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            onClick={handleCancel} 
+            className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -212,8 +227,7 @@ export default function VideoUploadForm({ courseId, onClose, onSuccess }: VideoU
           <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
+              onClick={handleCancel}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Cancel

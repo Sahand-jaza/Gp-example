@@ -5,8 +5,33 @@ import CourseView from './components/course/CourseView'
 import QuizView from './components/quiz/QuizView'
 import FocusMonitor from './components/monitoring/FocusMonitor'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Component, ErrorInfo, ReactNode } from 'react'
 import axios from 'axios'
+
+class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: {children: ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, color: 'red', background: 'white', minHeight: '100vh' }}>
+          <h2>Something went wrong.</h2>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.toString()}</pre>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 10 }}>{this.state.error?.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function HelloUser({ children }: { children: React.ReactNode }) {
   const { isLoaded } = useOrganization();
@@ -53,6 +78,7 @@ function HelloUser({ children }: { children: React.ReactNode }) {
 function App(): JSX.Element {
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-gray-100">
       <Routes>
         <Route
@@ -126,6 +152,7 @@ function App(): JSX.Element {
         />
       </Routes>
     </div>
+    </ErrorBoundary>
   )
 }
 

@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import s3Client from "../config/r2Storage";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import Video from "../models/Video";
 import Quiz from "../models/Quiz";
 import QuizScore from "../models/QuizScore";
@@ -26,20 +26,19 @@ const getSignedViewUrl = async (blobName: string) => {
 };
 
 // Configure Gemini to output strict JSON matching our Mongoose schema
-// Configure Gemini to output strict JSON matching our Mongoose schema
 const quizSchema = {
-  type: "OBJECT",
+  type: Type.OBJECT,
   properties: {
-    title: { type: "STRING", description: "A short, engaging title for this video quiz." },
+    title: { type: Type.STRING, description: "A short, engaging title for this video quiz." },
     questions: {
-      type: "ARRAY",
+      type: Type.ARRAY,
       description: "A list of 3-5 multiple choice questions based on the video.",
       items: {
-        type: "OBJECT",
+        type: Type.OBJECT,
         properties: {
-          questionText: { type: "STRING" },
-          options: { type: "ARRAY", items: { type: "STRING" }, description: "Exactly 4 multiple choice options." },
-          correctAnswerIndex: { type: "INTEGER", description: "The array index (0-3) of the correct option." }
+          questionText: { type: Type.STRING },
+          options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exactly 4 multiple choice options." },
+          correctAnswerIndex: { type: Type.INTEGER, description: "The array index (0-3) of the correct option." }
         },
         required: ["questionText", "options", "correctAnswerIndex"]
       }
@@ -48,8 +47,16 @@ const quizSchema = {
   required: ["title", "questions"]
 };
 
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { pipeline } from "stream/promises";
+
 // 1. Generate Quiz (Teacher Only)
 export const generateQuiz = async (req: Request, res: Response) => {
+  let tempFilePath: string | null = null;
+  let geminiFileName: string | null = null;
+  
   try {
     const { videoId } = req.params;
     const { userId: teacherId } = getAuth(req);
@@ -70,17 +77,59 @@ export const generateQuiz = async (req: Request, res: Response) => {
     // Generate Signed URL for Gemini (R2)
     const videoUrl = await getSignedViewUrl(video.s3Key);
 
-    console.log(`Sending Video to Gemini from URL: ${videoUrl.substring(0, 50)}...`);
+    console.log(`Downloading Video from URL: ${videoUrl.substring(0, 50)}...`);
 
-    // Call Gemini with the Video URL
+    // 1. Download video to a temporary file
+    const fetchResponse = await fetch(videoUrl);
+    if (!fetchResponse.ok || !fetchResponse.body) {
+      throw new Error(`Failed to download video: ${fetchResponse.statusText}`);
+    }
+    
+    tempFilePath = path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+    
+    // Convert Web stream to Node stream for pipeline
+    const { Readable } = require("stream");
+    const nodeReadable = Readable.fromWeb(fetchResponse.body as any);
+    const fileStream = fs.createWriteStream(tempFilePath);
+    
+    await pipeline(nodeReadable, fileStream);
+    
+    console.log(`Video downloaded to ${tempFilePath}, uploading to Gemini File API...`);
+
+    // 2. Upload to Gemini File API
+    const uploadResult = await ai.files.upload({
+      file: tempFilePath,
+      config: { mimeType: "video/mp4" },
+    });
+    
+    geminiFileName = uploadResult.name || null;
+    console.log(`Uploaded to Gemini as ${geminiFileName}. Waiting for processing...`);
+    
+    // 3. Wait for the video to be processed by Gemini (state = ACTIVE)
+    let fileState = uploadResult.state;
+    let attempts = 0;
+    while (fileState === "PROCESSING" && attempts < 30) {
+      await new Promise(r => setTimeout(r, 2000)); // Wait 2s
+      const fileInfo = await ai.files.get({ name: geminiFileName! });
+      fileState = fileInfo.state;
+      attempts++;
+    }
+    
+    if (fileState === "FAILED") {
+      throw new Error("Gemini File API failed to process the video.");
+    }
+    
+    console.log(`Video processing complete. State: ${fileState}. Generating quiz...`);
+
+    // 4. Call Gemini with the Video URL
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [
         {
           role: "user",
           parts: [
-            { text: "Watch this educational video and generate a multiple choice quiz to test a student's comprehension. Respond ONLY in valid JSON matching the schema." },
-            { fileData: { fileUri: videoUrl, mimeType: "video/mp4" } }
+            { fileData: { fileUri: uploadResult.uri, mimeType: "video/mp4" } },
+            { text: "Watch this educational video and generate a multiple choice quiz to test a student's comprehension. Respond ONLY in valid JSON matching the schema." }
           ]
         }
       ],
@@ -114,6 +163,25 @@ export const generateQuiz = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Generate Quiz Error:", error);
     res.status(500).json({ message: "Failed to generate quiz", error: error.message });
+  } finally {
+    // Cleanup temporary file
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (e) {
+        console.error("Failed to delete temp file:", e);
+      }
+    }
+    
+    // Optionally delete from Gemini to save space
+    if (geminiFileName) {
+      try {
+        await ai.files.delete({ name: geminiFileName });
+        console.log(`Deleted ${geminiFileName} from Gemini.`);
+      } catch (e) {
+        console.error("Failed to delete file from Gemini:", e);
+      }
+    }
   }
 };
 

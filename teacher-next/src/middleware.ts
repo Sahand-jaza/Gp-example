@@ -22,7 +22,6 @@ export default clerkMiddleware(async (auth, req) => {
     const rawRole =
       (sessionClaims?.metadata as any)?.role ||
       (sessionClaims?.publicMetadata as any)?.role ||
-      (sessionClaims?.unsafeMetadata as any)?.role ||
       (sessionClaims as any)?.orgRole;
 
     const isTeacher =

@@ -37,7 +37,12 @@ interface LiveStatus {
   lastSeen: Date;
 }
 
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:5000';
+import Constants from 'expo-constants';
+
+const debuggerHost = Constants.expoConfig?.hostUri;
+const localIp = debuggerHost?.split(':')[0];
+
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL || (localIp ? `ws://${localIp}:5000` : 'ws://localhost:5000');
 
 const EMOTION_MAP: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
   neutral:   { emoji: '😐', label: 'Focused',    color: '#2563eb', bg: '#dbeafe' },

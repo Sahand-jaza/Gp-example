@@ -3,8 +3,13 @@ import { requireOrgRole, requireAuth } from "../middleware/auth";
 import StudentProfile from "../models/StudentProfile";
 import { getAuth } from "@clerk/express";
 import { syncUser, getStudentCourses, getStudentCourse, enrollInCourse, getStudentProfile, markVideoComplete } from "../controllers/studentController";
+import { getPlatformSettings } from "../controllers/adminController";
 
 const router = express.Router();
+
+// GET /api/student/dashboard-settings
+// Returns platform settings (carousel titles)
+router.get("/dashboard-settings", requireAuth(), requireOrgRole("org:student"), getPlatformSettings);
 
 // POST /api/student/sync
 // Syncs the user from Clerk to MongoDB

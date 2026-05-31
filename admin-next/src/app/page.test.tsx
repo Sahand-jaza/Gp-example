@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import Page from './page'
 
 // Simple mock for Clerk and other components to allow basic rendering

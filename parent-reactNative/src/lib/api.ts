@@ -1,10 +1,16 @@
 import axios from "axios";
 import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
+import Constants from "expo-constants";
 
-// For local testing on emulator, you might need your machine's local IP address instead of localhost.
+// Extract the local IP address dynamically from Expo's Metro bundler host
+const debuggerHost = Constants.expoConfig?.hostUri;
+const localIp = debuggerHost?.split(":")[0];
+
+// Fallback to the dynamic IP, or localhost if undefined
 export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+  process.env.EXPO_PUBLIC_API_URL || 
+  (localIp ? `http://${localIp}:5000/api` : "http://localhost:5000/api");
 
 const api = axios.create({
   baseURL: API_URL,
