@@ -34,7 +34,7 @@ export default clerkMiddleware(async (auth, req) => {
       console.warn(
         `[Teacher Middleware] Access denied for user ${userId}. Role: ${rawRole}`
       );
-      return NextResponse.redirect(new URL("/?error=unauthorized", req.url));
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
   }
 });
