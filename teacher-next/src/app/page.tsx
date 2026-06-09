@@ -1,10 +1,19 @@
 'use client';
+import { useEffect } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const { isLoaded } = useAuth();
   const { user } = useUser();
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      router.push("/dashboard");
+    }
+  }, [isLoaded, user, router]);
 
   if (!isLoaded) {
     return (
@@ -14,9 +23,13 @@ export default function Home() {
     );
   }
 
-  // For now, allow anyone who logs in to access the Teacher Portal
+  // If user is loaded and logged in, we are redirecting, so show a loading state
   if (user) {
-    redirect("/dashboard");
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   // Fallback for non-logged-in users
