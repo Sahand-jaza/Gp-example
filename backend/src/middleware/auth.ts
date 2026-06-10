@@ -92,7 +92,7 @@ export const requireOrgRole = (requiredRole: string): RequestHandler => {
     if (!userRole) {
       try {
         const user = await clerkClient.users.getUser(userId);
-        userRole = (user.publicMetadata?.role as string);
+        userRole = (user.publicMetadata?.role as string) || (user.unsafeMetadata?.role as string);
       } catch (err) {
         console.error("Error fetching user from Clerk API:", err);
       }
